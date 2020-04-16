@@ -1,0 +1,137 @@
+<html>
+    <head>
+        <style>
+            .form {
+              margin:30px auto;
+              width:400px;
+              padding: 10px 30px 30px 30px;
+              border-radius: 10px;
+              box-shadow: 0px 0px 10px 0px #000;
+            }
+            .form-control {
+              margin-bottom:3px;
+              padding:5px;
+              width: 100%;
+              border:1px solid #CCC
+            }
+            .btn {
+              padding:5px
+            }
+            .titlebar {
+                background-image: linear-gradient(to right, rgba(0,0,255,0), rgba(0,0,255,1));
+            }
+        </style>
+        <script>
+        	const REDIRECT_URL = 'http://localhost:80'
+        	
+       		function resetPw () {
+       			let password = document.getElementById("password").value.trim()
+       			let confirmPassword = document.getElementById("confirmPassword").value.trim()
+       			
+       			if (password.length ==0) {
+       				alert('Password must be not Empty')
+       				document.getElementById('password').focus()
+       				return
+       			}
+       			
+       			if (password !== confirmPassword) {
+       				alert('Password does not match')
+       				document.getElementById('confirmPassword').focus()
+       				return
+       			}
+       			 
+       			const params = new URLSearchParams(window.location.search)
+       			const token = params.get('token')
+            	if (!token) {
+            		alert('Token is invalid. Please try to Reset again')
+       				return
+            	}
+       			
+       			let request = new XMLHttpRequest()
+                request.open('PUT', '/api/system/auth/reset-password')
+                request.setRequestHeader('content-type', 'application/json')
+                let obj = {
+                    'password' : password,
+                    'token' : token,
+                }
+
+                request.onreadystatechange = function() {
+                    if (request.readyState === XMLHttpRequest.DONE && request.status === 200) {
+                        console.log(request.responseText)
+                        alert(request.responseText)
+                        window.location = REDIRECT_URL
+                    }else {
+                        console.log(`Fail status ${request.status}  state ${request.readyState}`)
+                        if (request.readyState === XMLHttpRequest.DONE && request.responseText)
+                        	alert(request.responseText)	
+                    }
+                }
+
+                request.send(JSON.stringify(obj))	
+       		}
+       		       	
+        </script>
+    </head>
+
+    <body>
+        <div>
+            <div class="form">
+                <h3 class="titlebar">Reset Password Form</h3>
+                <form >
+                    New password:
+                    <input class="form-control" type="password" placeholder="Password" id="password" value="" required/>
+                    Confirm:
+                    <input class="form-control" type="password" placeholder="Password" id="confirmPassword" value="" required/>
+                    <br/>
+                    <button class="btn" type="button" onclick="resetPw()">Reset</button>
+                </form>
+            </div>
+        </div>
+    </body>
+    <script>
+    	
+    </script>
+    
+	<!-- 
+	<script language="JavaScript">
+      window.onload = function () {
+      document.addEventListener("contextmenu", function (e) {
+          e.preventDefault();
+      }, false);
+      document.addEventListener("keydown", function (e) {
+          //document.onkeydown = function(e) {
+          // "I" key
+          if (e.ctrlKey && e.shiftKey && e.keyCode == 73) {
+              disabledEvent(e);
+          }
+          // "J" key
+          if (e.ctrlKey && e.shiftKey && e.keyCode == 74) {
+              disabledEvent(e);
+          }
+          // "S" key + macOS
+          if (e.keyCode == 83 && (navigator.platform.match("Mac") ? e.metaKey : e.ctrlKey)) {
+              disabledEvent(e);
+          }
+          // "U" key
+          if (e.ctrlKey && e.keyCode == 85) {
+              disabledEvent(e);
+          }
+          // "F12" key
+          if (event.keyCode == 123) {
+              disabledEvent(e);
+          }
+      }, false);
+      function disabledEvent(e) {
+          if (e.stopPropagation) {
+              e.stopPropagation();
+          } else if (window.event) {
+              window.event.cancelBubble = true;
+          }
+          e.preventDefault();
+          return false;
+      }
+    }
+  </script>
+   -->
+
+</html>

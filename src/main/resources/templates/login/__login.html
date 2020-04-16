@@ -1,0 +1,210 @@
+<html>
+    <head>
+    	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css" />
+    	<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+        <style>
+            .form {
+              	margin:30px auto;
+              	width:300px;
+              	padding: 10px 30px 30px 30px;
+              	border-radius: 10px;
+              	box-shadow: 0px 0px 10px 0px #000;
+            }
+            .form-control {
+              	margin-bottom:3px;
+              	padding:5px;
+              	width: 100%;
+              	border:1px solid #CCC;
+            }
+            .btn {
+              	padding: 6px 20px;
+			  	color: white;
+			  	background-color: #1b5e20;
+			  	border-radius: 5px;
+			  	cursor: pointer;
+			  	font-weight: 400;
+			  	font-size: 1rem;
+				  
+            }
+            .image {
+            	width: 100%;
+            	height: auto;
+            	display: block;
+            }
+            .titlebar {
+                background-image: linear-gradient(to right, #093028, #237a57);
+                color: white;
+            }
+            
+            .loader {
+				position: relative;
+				height: 42px;
+				width: 42px;
+				display: none;
+				align-items: center;
+				justify-content: center;
+				color: red;
+				margin-top: -30px;
+				margin-left:120px;
+				float:left;
+			}
+			.loader:before {
+				content: "";
+				background: white;
+				position:absolute;
+				z-index:100;
+				width:40px;
+				height:40px;
+				border-radius:50%;
+				margin:auto auto;
+			}
+			progress::-moz-progress-bar { background: transparent; }
+			progress::-webkit-progress-bar {background: transparent;}
+			progress::-moz-progress-value { background: red; }
+			progress::-webkit-progress-value { background: red; }
+			.circle {
+				border-radius: 100%;
+				overflow: hidden;
+				padding:0;
+			}
+			.spin {
+			 animation: spin 2s linear infinite;
+			}
+			@keyframes spin {
+			  to {
+			    transform: rotate(360deg);
+			  }
+			}
+			html {
+				height: 100%;
+				display: flex;
+			}
+			body {
+			 	margin: auto;
+			}
+
+
+        </style>
+        
+        
+
+    </head>
+
+    <body>
+        <div>
+            <div class="form" onSubmit="login(event)">
+                <h3 class="titlebar" style="padding-left: 6px;"><i class="fa fa-sign-in-alt"></i> Login Form</h3>
+                <h2 align="center">Welcome to Skyone System</h2>
+                <img class="image" src="/images/logologin.png"/>
+                
+                <div id="qrcode" align="center">
+                
+                </div>
+                <form>
+                    Username:
+                    <input class="form-control" type="text" placeholder="Username" id="username" value="noisoi" required/>
+                    Password:
+                    <input class="form-control" type="password" placeholder="Password" id="password" value="2017" required/>
+                    <input type="checkbox" id="rememberMe" onchange="doRememberMe();">Remember me?</input>
+                    <span style="display: none" id ="periodOfTime"> in 
+                    	<select>
+                    		<option value="1">A day</option>
+                    		<option value="7">A week</option>
+                    		<option value="30">A month</option>
+                    		<option value="365">A year</option>
+                    		<option value="99999999">Forever</option>
+                    	</select>
+                     </span>
+                    <br/>
+                    <button class="btn" type="submit"><i class="fa fa-key"> </i>  Login</button>
+                    <br/>
+                    <a href="#" onClick="resetPassword()">Reset Password</a>
+                    <br/>
+                    <progress id="progressBar" max="100" value="95" class="spin circle loader"></progress>
+                </form>
+            </div>
+        </div>
+    </body>
+    <script>
+    	
+    </script>
+    
+	<!-- 
+	<script language="JavaScript">
+      window.onload = function () {
+      document.addEventListener("contextmenu", function (e) {
+          e.preventDefault();
+      }, false);
+      document.addEventListener("keydown", function (e) {
+          //document.onkeydown = function(e) {
+          // "I" key
+          if (e.ctrlKey && e.shiftKey && e.keyCode == 73) {
+              disabledEvent(e);
+          }
+          // "J" key
+          if (e.ctrlKey && e.shiftKey && e.keyCode == 74) {
+              disabledEvent(e);
+          }
+          // "S" key + macOS
+          if (e.keyCode == 83 && (navigator.platform.match("Mac") ? e.metaKey : e.ctrlKey)) {
+              disabledEvent(e);
+          }
+          // "U" key
+          if (e.ctrlKey && e.keyCode == 85) {
+              disabledEvent(e);
+          }
+          // "F12" key
+          if (event.keyCode == 123) {
+              disabledEvent(e);
+          }
+      }, false);
+      function disabledEvent(e) {
+          if (e.stopPropagation) {
+              e.stopPropagation();
+          } else if (window.event) {
+              window.event.cancelBubble = true;
+          }
+          e.preventDefault();
+          return false;
+      }
+    }
+  </script>
+   -->
+   	
+ 	<script src="/js/main.js"></script>
+ 	<script src="/js/qrcode.min.js"></script>
+ 	
+ 	<script src="/js/node_modules/apollo-link/lib/bundle.umd.js"></script>
+ 	<script src="/js/node_modules/apollo-link-http/lib/bundle.umd.js"></script>
+ 	<script src="/js/node_modules/graphql-tag/lib/graphql-tag.umd.js"></script>
+ 	<script src="/js/hasura-client.js"></script>
+ 	<script>
+	 	const qrcode = new QRCode(document.getElementById("qrcode"), {
+	 	    width : 100,
+	 	    height : 100
+	 	});
+	 	
+	 	getQrcode().then((res) => { 	
+	 		console.log(res);
+	 		qrcode.makeCode(res);
+	 	});
+	 	
+	 	
+	 	const query = gql`
+	 	  subscription SubAuthToken {
+	 	    auth_token {
+	 	      authorized
+	 	      id
+	 	    }
+	 	  }
+	 	`;
+	 	const sub$ = apolloClient.subscribe({
+		  query,
+		});
+		
+		sub$.subscribe((res) => {
+		    console.log(res);
+		})
+	 	
+ 	</script>
+</html>
