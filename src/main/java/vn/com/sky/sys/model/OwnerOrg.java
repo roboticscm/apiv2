@@ -1,8 +1,12 @@
 package vn.com.sky.sys.model;
 
+import javax.validation.constraints.NotBlank;
+
+import org.springframework.data.relational.core.mapping.Table;
+
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.springframework.data.relational.core.mapping.Table;
+import vn.com.sky.Message;
 import vn.com.sky.base.SortableEntity;
 
 @EqualsAndHashCode(callSuper = false)
@@ -12,6 +16,7 @@ public class OwnerOrg extends SortableEntity {
     private Long parentId;
     private Integer type;
     private String code;
+    @NotBlank(message = Message.NAME_IS_REQUIRED)
     private String name;
     private String slogan;
     private String fontIcon;

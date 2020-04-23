@@ -7,18 +7,20 @@ import static org.springframework.web.reactive.function.server.ServerResponse.ba
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import lombok.AllArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import lombok.AllArgsConstructor;
 import reactor.core.publisher.Mono;
+import vn.com.sky.Constants;
 import vn.com.sky.Message;
 import vn.com.sky.base.GenericREST;
 import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.security.PBKDF2Encoder;
-import vn.com.sky.sys.auth.HumanOrOrgRepo;
 import vn.com.sky.sys.model.HumanOrOrg;
 import vn.com.sky.sys.model.HumanOrg;
 import vn.com.sky.util.CustomRepoUtil;
@@ -187,6 +189,16 @@ public class HumanOrOrgREST extends GenericREST {
                                                 }
 
                                                 humanReq.setPassword(encodedPassword);
+                                                
+                                                if (Constants.SUPER_USER.equals(found.getUsername())) {
+                                                	// if login user is not Super User
+                                                	if(humanReq.getId() != auth.getUserId()) {
+                                                		return error("SYS.MSG.MODIFY_PREVENT");
+                                                	} else {
+	                                                	// Do not modify username of Super user
+	                                                	humanReq.setUsername(found.getUsername());
+                                                	}
+                                                }
                                                 return updateEntity(mainRepo, humanReq, auth)
                                                     .flatMap(
                                                         updated -> {

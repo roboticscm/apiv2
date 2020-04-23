@@ -89,14 +89,16 @@ $$ language plpgsql called on null input;
 -- Section: Owner Org (ono)
 -- Function Description: Get owner org tree
 -- Params:
+--  _parent_id: null if whole tree
 --  _include_deleted: Include deleted record
 --  _include_disabled: Include disabled record
-create or replace function sys_get_owner_org_tree(_include_deleted bool, _include_disabled bool)
+
+create or replace function sys_get_owner_org_tree(_parent_id bigint, _include_deleted bool, _include_disabled bool)
 returns text as $$
 with recursive org as (
    	select id, parent_id as "pId", name, type, font_icon as "fontIcon", use_font_icon as "useFontIcon", icon_data as "iconData", true as "open", sort
    	from owner_org
-   	where parent_id is null
+   	where ((parent_id = _parent_id or _parent_id is null) or (id = _parent_id))
 		and ((deleted_by is null and _include_deleted = false) or _include_deleted = true)
 		and ((disabled = false and _include_disabled = false) or _include_disabled = true)
    	union
@@ -110,11 +112,10 @@ select coalesce(json_agg(t), '[]')::text
 from(
 	select *
 	from org
-	order by sort
+	order by sort, name
 ) as t;
 $$
 language sql;
-
 
 
 -- Module: System (sys)

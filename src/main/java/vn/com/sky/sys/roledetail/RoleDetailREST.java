@@ -148,7 +148,6 @@ public class RoleDetailREST extends GenericREST {
                                                                             )
                                                                             .flatMap(
                                                                                 foundRoleControl -> {
-                                                                                	System.out.println("call 111");
                                                                                     // update role control
                                                                                     foundRoleControl.setRenderControl(
                                                                                         roleControl.getRenderControl()
@@ -247,7 +246,6 @@ public class RoleDetailREST extends GenericREST {
                                                             )
                                                             .flatMap(
                                                                 foundRoleControl -> {
-                                                                	System.out.println("call 222");
                                                                     // update role control
                                                                     foundRoleControl.setRenderControl(
                                                                         roleControl.getRenderControl()
@@ -294,7 +292,6 @@ public class RoleDetailREST extends GenericREST {
         Long roleDetailId,
         RoleDetailWithControl roleDetailWithControl
     ) {
-    	System.out.println("call");
         return Mono.defer(
             () -> {
                 var newRoleControl = new RoleControl();
@@ -309,8 +306,6 @@ public class RoleDetailREST extends GenericREST {
                     .findByMenuIdAndControlId(roleDetailWithControl.getMenuId(), roleDetailWithControl.getControlId())
                     .flatMap(
                         foundRoleControl -> {
-                        	System.out.println("xxxxxx");
-                        	System.out.println(newRoleControl);
                             newRoleControl.setMenuControlId(foundRoleControl.getId());
                             return saveEntity(roleControlRepo, newRoleControl, auth);
                         }

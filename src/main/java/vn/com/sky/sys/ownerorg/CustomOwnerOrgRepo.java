@@ -16,14 +16,20 @@ public class CustomOwnerOrgRepo extends BaseR2dbcRepository {
 	--  includeDisabled: Include disabled record
 	
 	*/
-    public Mono<String> sysGetOwnerOrgTree(Boolean includeDeleted, Boolean includeDisabled) {
+    public Mono<String> sysGetOwnerOrgTree(Long parentId, Boolean includeDeleted, Boolean includeDisabled) {
         String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
 
         var ret =
             this.databaseClient()
-                .execute(genSql(methodName, "includeDeleted", "includeDisabled"))
+                .execute(genSql(methodName, "parentId",  "includeDeleted", "includeDisabled"))
                 .bind("includeDeleted", includeDeleted)
                 .bind("includeDisabled", includeDisabled);
+        
+        if (parentId == null) {
+        	ret = ret.bindNull("parentId", Long.class);
+        } else {
+        	ret = ret.bind("parentId", parentId);
+        }
 
         return ret.as(String.class).fetch().first();
     }

@@ -5,9 +5,6 @@ package vn.com.sky.sys.auth;
 
 import static org.springframework.web.reactive.function.BodyExtractors.toMono;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -23,6 +20,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
@@ -30,9 +28,15 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.server.ServerRequest;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import reactor.core.publisher.Mono;
 import vn.com.sky.SkyplusApplication;
 import vn.com.sky.security.PBKDF2Encoder;
+import vn.com.sky.sys.humanororg.HumanOrOrgRepo;
 import vn.com.sky.sys.model.HasuraClaims;
 import vn.com.sky.sys.model.HumanOrOrg;
 import vn.com.sky.sys.usersettings.CustomUserSettingsRepo;
