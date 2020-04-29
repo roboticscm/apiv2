@@ -61,15 +61,17 @@ public class WebSecurityConfig {
             .authorizeExchange()
             .pathMatchers(HttpMethod.OPTIONS)
             .permitAll()
-            .pathMatchers(HttpMethod.GET)
-            .permitAll()
             .pathMatchers(
                 "/",
                 "/document",
                 "/index.html",
                 "/js/main.js",
+                "/js/index.js",
+                "/js/qrcode.min.js",
                 "/login",
                 "/login/login",
+                "/api/sys/news/get-list",
+                "/api/sys/table-util/get-one-by-id",
                 "/api/sys/auth/get-qrcode",
                 "/api/sys/auth/reset-password",
                 "/api/sys/auth/login",

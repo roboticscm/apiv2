@@ -68,7 +68,18 @@ public class OwnerOrgREST extends GenericREST {
                 }
             );
 
-        return Flux.concat(validateCode).collectList();
+        var validateName = mainRepo.isNameExisted(req.getName(), req.getParentId())
+                .flatMap(
+                    nameExisted -> {
+                        if (nameExisted) {
+                            var serverError = new LinkedHashMap<String, String>();
+                            serverError.put("name", "SYS.MSG.NAME_EXISTED");
+                            return Mono.just(serverError);
+                        }
+                        return Mono.empty();
+                    }
+                );
+        return Flux.concat(validateCode, validateName).collectList();
     }
     
     private Mono<List<LinkedHashMap<String, String>>> validateForUpdate(OwnerOrg req) {
@@ -147,6 +158,7 @@ public class OwnerOrgREST extends GenericREST {
                 .collectList()
                 .flatMap(
                     item -> {
+                    	System.out.println(item);
                         return ok(item, List.class);
                     }
                 )

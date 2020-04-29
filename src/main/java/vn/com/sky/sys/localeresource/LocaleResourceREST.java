@@ -6,18 +6,21 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 import static org.springframework.web.reactive.function.server.ServerResponse.badRequest;
 
 import java.util.List;
-import lombok.AllArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import lombok.AllArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.Message;
 import vn.com.sky.base.GenericREST;
 import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.model.LocaleResource;
+import vn.com.sky.sys.ownerorg.OwnerOrgRepo;
 import vn.com.sky.util.MyServerResponse;
 
 @Configuration
@@ -26,6 +29,8 @@ public class LocaleResourceREST extends GenericREST {
     private CustomLocaleResourceRepo customRepo;
     private LocaleResourceRepo mainRepo;
     private AuthenticationManager auth;
+    private OwnerOrgRepo ownerOrgRepo;
+    
 
     @Bean
     public RouterFunction<?> localeResourceRoutes() {
@@ -254,10 +259,8 @@ public class LocaleResourceREST extends GenericREST {
 
         try {
             if (companyIdStr != null && !"null".equals(companyIdStr)) companyId = Long.parseLong(companyIdStr);
-            if (companyId == null) return badRequest().bodyValue("SYS.MSG.INVILID_COMPANY_ID");
         } catch (Exception e) {
-            e.printStackTrace();
-            return badRequest().bodyValue("SYS.MSG.INVILID_COMPANY_ID");
+           
         }
 
         try {
@@ -269,10 +272,24 @@ public class LocaleResourceREST extends GenericREST {
         }
 
         try {
-            return customRepo
-                .sysGetLocaleResourceListByCompanyIdAndLocale(companyId, localeStr, includeDeleted, includeDisabled)
-                .flatMap(item -> ok(item))
-                .onErrorResume(e -> error(e));
+        	if (companyId == null) {
+        		var _includeDeleted = includeDeleted;
+        		var _includeDisabled = includeDisabled;
+        		return ownerOrgRepo.findFirstCompanyId().flatMap(foundCompanyId -> {
+        			System.out.println("foundCompanyId");
+        			System.out.println(foundCompanyId);
+        			return customRepo
+                            .sysGetLocaleResourceListByCompanyIdAndLocale(foundCompanyId, localeStr, _includeDeleted, _includeDisabled)
+                            .flatMap(item -> ok(item))
+                            .onErrorResume(e -> error(e));
+        		});
+        	} else {
+        		return customRepo
+                    .sysGetLocaleResourceListByCompanyIdAndLocale(companyId, localeStr, includeDeleted, includeDisabled)
+                    .flatMap(item -> ok(item))
+                    .onErrorResume(e -> error(e));
+        	}
+            
         } catch (Exception e) {
             e.printStackTrace();
         }

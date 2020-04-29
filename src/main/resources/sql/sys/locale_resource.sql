@@ -14,7 +14,7 @@ declare
 begin
 _query = format('select coalesce(json_agg(t), ''[]'')::text 
 from(
-select id, key, value, category, type_group as "typeGroup"
+select company_id as "companyId", id, key, value, category, type_group as "typeGroup"
 from locale_resource
 where company_id = %L
 	and locale = %L

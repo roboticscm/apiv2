@@ -77,10 +77,6 @@ public class UserSettingsREST extends GenericREST {
 
         Long userId = auth.getUserId();
 
-        System.out.println(menuPathStr);
-        System.out.println(controlId);
-        System.out.println(userId);
-
         if (menuPathStr == null) return badRequest().bodyValue("SYS.MSG.INVILID_MENU_PATH");
 
         if (controlId == null) return badRequest().bodyValue("SYS.MSG.INVILID_CONTROL_ID");

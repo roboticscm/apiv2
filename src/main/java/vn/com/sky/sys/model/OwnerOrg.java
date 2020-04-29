@@ -34,4 +34,5 @@ public class OwnerOrg extends SortableEntity {
     private String twitter;
     private String skype;
     private String website;
+    private Boolean defaultOrg = false;
 }
