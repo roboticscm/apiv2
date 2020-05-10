@@ -34,4 +34,16 @@ public class CustomRepoUtil extends BaseR2dbcRepository {
 
         return ret.as(Boolean.class).fetch().first();
     }
+    
+    public Mono<Long> getMaxSort(String tableName) {
+        String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+
+        var ret =
+            this.databaseClient()
+                .execute(genSql(methodName, "tableName"))
+                .bind("tableName", tableName);
+
+
+        return ret.as(Long.class).fetch().first();
+    }
 }

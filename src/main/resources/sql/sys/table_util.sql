@@ -258,3 +258,20 @@ execute _query into ret_val;
 return ret_val;
 end;
 $$ language plpgsql called on null input;
+
+
+
+create or replace function get_max_sort(_table_name text)
+returns bigint as $$
+declare 
+	_query TEXT;
+	ret_val bigint;
+begin
+_query = format('
+	select coalesce(max(sort),0) from %s
+', _table_name);
+
+execute _query into ret_val;
+return ret_val;
+end;
+$$ language plpgsql called on null input;

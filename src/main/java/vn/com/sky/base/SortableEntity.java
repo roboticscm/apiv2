@@ -11,5 +11,5 @@ import lombok.Data;
  */
 @Data
 public class SortableEntity extends GenericEntity {
-    private Long sort = 0L;
+    private Long sort;
 }

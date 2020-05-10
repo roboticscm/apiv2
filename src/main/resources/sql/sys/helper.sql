@@ -95,3 +95,27 @@ execute __query into ret_val;
 return  ret_val;
 end;
 $$ language plpgsql called on null input;
+
+
+
+create or replace function get_max_data_level(_user_id bigint, _menu_path text, _dep_id bigint)
+returns smallint as $$
+declare 
+	_query text;
+	ret_val text;
+begin
+_query = format(' 
+	select max(data_level)
+	from role_detail
+	where menu_org_id in (select id from menu_org where org_id = %L and menu_id in (select id from menu where path=%L ))
+		and role_id in (select role_id from assignment_role where user_id=%L)
+', _dep_id, _menu_path, _user_id);
+
+execute _query into ret_val;
+return  ret_val;
+end;
+$$ language plpgsql called on null input;
+
+
+
+

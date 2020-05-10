@@ -57,6 +57,39 @@ public class CustomOwnerOrgRepo extends BaseR2dbcRepository {
     /*
 	-- Module: System (sys)
 	-- Section: Owner Org (ono)
+	-- Function Description: Get owner org with human tree
+	-- Params:
+	--  includeDeleted: Include deleted record
+	--  includeDisabled: Include disabled record
+	*/
+    public Mono<String> sysGetOwnerOrgHumanTree(String filter, String excludeHumanIds, Boolean includeDeleted, Boolean includeDisabled) {
+        String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+
+        var ret =
+            this.databaseClient()
+                .execute(genSql(methodName, "filter", "excludeHumanIds", "includeDeleted", "includeDisabled"))
+                .bind("includeDeleted", includeDeleted)
+                .bind("includeDisabled", includeDisabled);
+
+        if (filter != null) {
+        	ret = ret.bind("filter", filter);
+        } else {
+        	ret = ret.bindNull("filter", String.class);
+        }
+        
+        
+        if (excludeHumanIds != null) {
+        	ret = ret.bind("excludeHumanIds", excludeHumanIds);
+        } else {
+        	ret = ret.bindNull("excludeHumanIds", String.class);
+        }
+        
+        return ret.as(String.class).fetch().first();
+    }
+    
+    /*
+	-- Module: System (sys)
+	-- Section: Owner Org (ono)
 	-- Function Description: Get assigned role department list by user id
 	-- Params:
 	--  userId

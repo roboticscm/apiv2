@@ -232,6 +232,59 @@ end;
 $$ language plpgsql called on null input;
 
 
+
+create or replace function sys_get_owner_org_human_tree(_filter text, _exclude_human_ids text, _include_deleted bool, _include_disabled bool)
+returns text as $$
+declare 
+	_query TEXT;
+	ret_val TEXT;
+	_filter_cond TEXT;
+	_filter_cond2 TEXT;
+	_exclude_cond TEXT;
+	_exclude_cond2 TEXT;
+begin
+_filter_cond = '';
+_filter_cond2 = '';
+_exclude_cond = '';
+_exclude_cond2 = '';
+
+if _filter is not null then
+	_filter_cond = ' and (unaccent(lower(last_name)) like unaccent(lower(''%' || _filter || '%'')) or unaccent(lower(first_name)) like unaccent(lower(''%' || _filter || '%'')) or unaccent(lower(first_name)) || '' '' || unaccent(lower(last_name)) like unaccent(lower(''%' || _filter || '%'')) or unaccent(lower(last_name)) || '' '' || unaccent(lower(first_name)) like unaccent(lower(''%' || _filter || '%'')) )';
+	_filter_cond2 = ' and (unaccent(lower(h.last_name)) like unaccent(lower(''%' || _filter || '%'')) or unaccent(lower(h.first_name)) like unaccent(lower(''%' || _filter || '%'')) or unaccent(lower(h.first_name)) || '' '' || unaccent(lower(h.last_name)) like unaccent(lower(''%' || _filter || '%'')) or unaccent(lower(h.last_name)) || '' '' || unaccent(lower(h.first_name)) like unaccent(lower(''%' || _filter || '%'')) )';
+end if;
+
+if _exclude_human_ids is not null then
+	_exclude_cond = ' and id not in (' || _exclude_human_ids || ') ';
+	_exclude_cond2 = ' and h.id not in (' || _exclude_human_ids || ') ';
+end if;
+
+_query = 'select coalesce(json_agg(t), ''[]'')::text 
+from(
+	with recursive org as (
+		select id, name, parent_id, sort, type
+		from owner_org
+		where id in (select default_owner_org_id from human_or_org where ' || get_deleted_cond_str(null, _include_deleted) || ' and '|| get_disabled_cond_str(null, _include_disabled) || _filter_cond || _exclude_cond || ')
+		union
+		select oo.id, oo.name, oo.parent_id, oo.sort, oo.type
+		from owner_org oo
+		inner join org on org.parent_id=oo.id
+	)
+	select ''org'' || o.id as id, o.name, ''org'' || o.parent_id as "pId", o.sort, o.type, true as "open"
+	from org o
+	union
+	select ''human'' || h.id, h.last_name || '' '' || h.first_name as name, ''org'' || o.id as "pId", null as sort, null as type, true as "open"
+	from human_or_org h
+	inner join org o on o.id = h.default_owner_org_id
+	where 1 = 1 ' || _filter_cond2 || _exclude_cond2 || '
+	order by type, sort, name
+) as t';
+
+execute _query into ret_val;
+return  ret_val;
+end;
+$$ language plpgsql called on null input;
+
+
 -- Module: System (sys)
 -- Section: Owner Org (ono)
 -- Function Description: Get assigned role department list by user id

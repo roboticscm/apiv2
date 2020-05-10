@@ -14,6 +14,7 @@ import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
+import io.netty.util.internal.StringUtil;
 import lombok.AllArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -37,6 +38,7 @@ public class OwnerOrgREST extends GenericREST {
         return route(GET(buildURL("owner-org", this::sysGetOwnerOrgTree)), this::sysGetOwnerOrgTree)
             .andRoute(GET(buildURL("owner-org", this::sysGetCompanyList)), this::sysGetCompanyList)
             .andRoute(GET(buildURL("owner-org", this::sysGetOwnerOrgRoleTree)), this::sysGetOwnerOrgRoleTree)
+            .andRoute(GET(buildURL("owner-org", this::sysGetOwnerOrgHumanTree)), this::sysGetOwnerOrgHumanTree)
             .andRoute(
                 GET(buildURL("owner-org", this::sysGetAvailableDepartmentTreeForMenu)),
                 this::sysGetAvailableDepartmentTreeForMenu
@@ -158,7 +160,6 @@ public class OwnerOrgREST extends GenericREST {
                 .collectList()
                 .flatMap(
                     item -> {
-                    	System.out.println(item);
                         return ok(item, List.class);
                     }
                 )
@@ -234,6 +235,48 @@ public class OwnerOrgREST extends GenericREST {
         }
         return null;
     }
+    
+    private Mono<ServerResponse> sysGetOwnerOrgHumanTree(ServerRequest request) {
+        // SYSTEM BLOCK CODE
+        // PLEASE DO NOT EDIT
+        if (request == null) {
+            String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+            return Mono.just(new MyServerResponse(methodName));
+        }
+        // END SYSTEM BLOCK CODE
+
+        var filter = getParam(request, "filter");
+        var excludeHumanIds = getParam(request, "excludeHumanIds");
+        
+        if (StringUtil.isNullOrEmpty(filter)) {
+        	filter = null;
+        }
+        
+        if (StringUtil.isNullOrEmpty(excludeHumanIds)) {
+        	excludeHumanIds = null;
+        }
+        
+        Boolean includeDeleted = false, includeDisabled = false;
+
+        try {
+            includeDeleted = super.getIncludeDeleted(request);
+            includeDisabled = super.getIncludeDisabled(request);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return badRequest().bodyValue("SYS.MSG.INVILID_INCLUDE_DELETED");
+        }
+
+        try {
+            return customRepo
+                .sysGetOwnerOrgHumanTree(filter, excludeHumanIds, includeDeleted, includeDisabled)
+                .flatMap(item -> ok(item))
+                .onErrorResume(e -> error(e));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
 
     private Mono<ServerResponse> sysGetRoledDepartmentListByUserId(ServerRequest request) {
         // SYSTEM BLOCK CODE

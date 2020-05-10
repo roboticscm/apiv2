@@ -1,7 +1,5 @@
 package vn.com.sky.base;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -11,18 +9,25 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
 import javax.validation.ConstraintViolation;
 import javax.validation.Validator;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.Constants;
 import vn.com.sky.security.AuthenticationManager;
+import vn.com.sky.util.CustomRepoUtil;
 import vn.com.sky.util.MyServerResponse;
 import vn.com.sky.util.OneToOneRepo;
 import vn.com.sky.util.SDate;
@@ -36,7 +41,9 @@ import vn.com.sky.util.StringUtil;
 public class GenericREST {
     @Autowired
     protected Validator validator;
-
+    @Autowired
+    protected CustomRepoUtil utilRepo;
+    
     public Long getCurrentDateTime() {
         return SDate.now();
     }
@@ -105,29 +112,46 @@ public class GenericREST {
     }
 
     protected String buildURL(String func, HandlerFunction<?> handlerFunction) {
+        return buildURL(Constants.API_PREFIX, func, handlerFunction);
+    }
+    
+    protected String buildURL(String prefix, String func, HandlerFunction<?> handlerFunction) {
         try {
             var methodName = ((MyServerResponse) handlerFunction.handle(null).block()).body;
-
-            return Constants.API_PREFIX + func + "/" + StringUtil.toSnackCase(methodName, "-");
+            return prefix + (func.length() > 0 ? func + "/" : "") + StringUtil.toSnackCase(methodName, "-");
         } catch (ClassCastException e) {
             System.out.println("Missng SYSTEM BLOCK CODE in " + handlerFunction);
             return null;
         }
     }
 
-    protected <T extends GenericEntity> Mono<T> saveEntity(
-        ReactiveCrudRepository<T, Long> repo,
-        T entity,
-        AuthenticationManager auth
-    ) {
-        entity.createdBy(auth.getUserId());
-        entity.setCreatedDate(SDate.now());
-        entity.setVersion(1);
-        entity.setDisabled(false);
-        System.out.println(entity);
-        return repo.save(entity);
+    protected <T extends GenericEntity> String getTableName (T entity) {
+    	return StringUtil.toSnackCase(entity.getClass().getSimpleName(), "_").substring(1);
     }
+    
+    protected <T extends GenericEntity> Mono<T> saveEntity(
+            ReactiveCrudRepository<T, Long> repo,
+            T entity,
+            AuthenticationManager auth
+        ) {
+            entity.createdBy(auth.getUserId());
+//            entity.setCreatedDate(SDate.now());
+//            entity.setVersion(1);
+//            entity.setDisabled(false);
 
+            if (entity instanceof SortableEntity) {
+            	var tableName = getTableName(entity);
+            	return utilRepo.getMaxSort(tableName).flatMap(maxSort -> {
+            		((SortableEntity) entity).setSort(maxSort + 1);
+            		return repo.save(entity);
+            	});
+            	
+            } else {
+            	return repo.save(entity);
+            }
+            
+        }
+    
     protected <T extends GenericEntity> Mono<T> updateEntity(
         ReactiveCrudRepository<T, Long> repo,
         T entity,

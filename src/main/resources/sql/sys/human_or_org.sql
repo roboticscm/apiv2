@@ -111,3 +111,42 @@ end;
 $$ language plpgsql called on null input;
 
 
+
+
+
+-- return null if full control
+-- return '' if there is no staff
+-- otherwise, return list ids of staff
+create or replace function get_list_staff_ids(_user_id bigint, _menu_path text, _dep_id bigint)
+returns text as $$
+declare 
+	_query text;
+	ret_val text;
+	is_admin bool;
+	data_level smallint;
+begin
+-- data_level = 10000: company
+-- data_level = 1000: branch
+-- data_level = 100: department
+-- data_level = 10: group
+-- data_level = 0: default
+
+is_admin = is_system_admin_by_user_id(_user_id, false, false);
+data_level = get_max_data_level(_user_id, _menu_path, _dep_id);
+
+if is_admin = true or data_level = 10000 then
+	ret_val = null;
+elseif data_level is not null then
+	_query = format(' 
+		select array_to_string(array_agg(distinct human_id), '','')
+		from human_org
+		where org_id in (%s)
+	', sys_get_sub_org_ids(sys_get_owner_id_of_user(_user_id, data_level, false, false)::bigint, false, false));
+	execute _query into ret_val;
+else 
+	ret_val = '';
+end if;
+
+return  ret_val;
+end;
+$$ language plpgsql called on null input;
