@@ -21,6 +21,7 @@ public class TskStatusDetail extends GenericEntity {
 	private Long endTime;
 	private String note;
 	private String assignPosition;
+    private Integer submitStatus = 0;
 	
 	@Transient
 	private ArrayList<String> attachFiles;

@@ -71,6 +71,7 @@ $$ language plpgsql called on null input;
 
 
 
+
 create or replace function paginate(_query text, _page bigint, _page_size bigint)
 returns text as $$
 declare 
@@ -95,6 +96,86 @@ execute __query into ret_val;
 return  ret_val;
 end;
 $$ language plpgsql called on null input;
+
+
+
+
+CREATE OR REPLACE FUNCTION paginate(_select TEXT, _from TEXT, _order_by TEXT, _page BIGINT, _page_size BIGINT)
+RETURNS TEXT AS $$
+DECLARE 
+	__query TEXT;
+	__query_count TEXT;
+	ret_val TEXT;
+	paging TEXT = '';
+	full_count BIGINT;
+BEGIN
+IF _page_size != -1 AND _page > 0 THEN
+	paging = 'LIMIT ' || _page_size || ' OFFSET ' || _page_size*(_page - 1);
+END IF;
+
+__query_count =  format('
+	SELECT COUNT(*) AS "fullCount"
+	%s
+', _from);
+	
+EXECUTE __query_count INTO full_count;
+
+IF full_count > 1000 THEN
+	_order_by = null;
+END IF;
+
+__query = format('
+	SELECT TO_JSON (T) FROM (
+		SELECT MIN(%s) AS "fullCount",
+			(SELECT JSON_AGG(content) FROM (
+				%s
+				%s
+				%s
+				%s
+				) AS content) AS payload
+		%s
+	) AS T
+', full_count, _select, _from, _order_by, paging, _from);
+
+EXECUTE __query INTO ret_val;
+RETURN  ret_val;
+END;
+$$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
+
+
+
+
+CREATE OR REPLACE FUNCTION paginate(_full_count_query TEXT, _payload_query TEXT, _order_by TEXT)
+RETURNS TEXT AS $$
+DECLARE 
+	full_query TEXT;
+	ret_val TEXT;
+	full_count BIGINT;
+BEGIN
+	
+EXECUTE _full_count_query INTO full_count;
+
+IF full_count > 1000 THEN
+	_order_by = null;
+END IF;
+
+full_query = format('
+	SELECT TO_JSON (T) FROM (
+		SELECT MIN(%s) AS "fullCount",
+			(SELECT JSON_AGG(content) FROM (
+				%s
+				%s
+				) AS content) AS payload
+	) AS T
+', full_count, _payload_query, _order_by);
+
+raise notice '%', full_query;
+
+EXECUTE full_query INTO ret_val;
+RETURN  ret_val;
+END;
+$$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
+
 
 
 

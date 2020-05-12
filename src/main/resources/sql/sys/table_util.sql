@@ -126,10 +126,10 @@ declare
 	_query text;
 	ret_val text;
 begin
-_query = format('select ''select '' || array_to_string(array(select c.column_name
+_query = format('select ''select '' || array_to_string(array(select c.column_name::text
         from information_schema.columns As c
             where table_name = %L
-            and  c.column_name not in(%s)
+            and  c.column_name::text not in(%s)
     ), %L)', _table_name, _except_columns, ',');
 execute _query into ret_val;
 return ret_val;

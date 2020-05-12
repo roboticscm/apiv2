@@ -30,5 +30,6 @@ public class TskTask extends GenericEntity {
 	private Long evaluateVerification;
 	private Long evaluateStatus;
 	private Boolean evaluateComplete = false;
+    private Integer submitStatus = 0;
 
 }
