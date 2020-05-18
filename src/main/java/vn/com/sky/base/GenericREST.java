@@ -134,7 +134,7 @@ public class GenericREST {
             T entity,
             AuthenticationManager auth
         ) {
-            entity.createdBy(auth.getUserId());
+            entity.createdBy(auth != null ? auth.getUserId() : null);
 //            entity.setCreatedDate(SDate.now());
 //            entity.setVersion(1);
 //            entity.setDisabled(false);
@@ -157,7 +157,8 @@ public class GenericREST {
         T entity,
         AuthenticationManager auth
     ) {
-        entity.updatedBy(auth.getUserId());
+        entity.updatedBy(auth != null ? auth.getUserId() : null);
+        
         return repo.save(entity);
     }
 
@@ -208,7 +209,14 @@ public class GenericREST {
     }
 
     protected String getParam(ServerRequest request, String paramName, String defaultValue) {
-        return URLDecoder.decode(request.queryParam(paramName).orElse(defaultValue), StandardCharsets.UTF_8);
+    	
+        var value = URLDecoder.decode(request.queryParam(paramName).orElse(defaultValue), StandardCharsets.UTF_8);
+        
+        if(StringUtil.isBlank(value)) {
+        	value = null;
+        }
+        
+        return value;
     }
 
     protected String getParam(ServerRequest request, String paramName) {

@@ -180,4 +180,20 @@ public class CustomOwnerOrgRepo extends BaseR2dbcRepository {
 
         return ret.as(String.class).fetch().first();
     }
+    
+    
+    
+    public Mono<Long> sysGetFirstRoledDepId(Long userId, String menuPath) {
+        String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+
+        var ret = this.databaseClient()
+        		.execute(genSql(methodName, "userId", "menuPath"))
+        		.bind("userId", userId)
+        		.bind("menuPath", menuPath);
+
+        return ret.as(Long.class)
+        		.fetch()
+        		.first();
+    }
+   
 }

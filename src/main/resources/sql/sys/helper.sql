@@ -145,31 +145,21 @@ $$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
 
 
 
-CREATE OR REPLACE FUNCTION paginate(_full_count_query TEXT, _payload_query TEXT, _order_by TEXT)
+CREATE OR REPLACE FUNCTION sys_build_json(_full_count_query TEXT, _payload_query TEXT)
 RETURNS TEXT AS $$
 DECLARE 
 	full_query TEXT;
 	ret_val TEXT;
-	full_count BIGINT;
 BEGIN
-	
-EXECUTE _full_count_query INTO full_count;
-
-IF full_count > 1000 THEN
-	_order_by = null;
-END IF;
 
 full_query = format('
 	SELECT TO_JSON (T) FROM (
-		SELECT MIN(%s) AS "fullCount",
-			(SELECT JSON_AGG(content) FROM (
-				%s
+		SELECT (%s) AS "fullCount",
+			(SELECT COALESCE(JSON_AGG(content), ''[]'') FROM (
 				%s
 				) AS content) AS payload
 	) AS T
-', full_count, _payload_query, _order_by);
-
-raise notice '%', full_query;
+', _full_count_query, _payload_query);
 
 EXECUTE full_query INTO ret_val;
 RETURN  ret_val;

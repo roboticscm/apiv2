@@ -499,3 +499,35 @@ execute _query into ret_val;
 return  ret_val;
 end;
 $$ language plpgsql called on null input;
+
+
+
+
+CREATE OR REPLACE FUNCTION sys_get_first_roled_dep_id(_user_id BIGINT, _menu_path TEXT)
+RETURNS BIGINT AS $$
+DECLARE 
+	_query TEXT;
+	ret_val BIGINT;
+BEGIN
+IF is_system_admin_by_user_id(_user_id, FALSE, FALSE) THEN
+_query = FORMAT('
+	SELECT org_id
+	FROM menu_org
+	WHERE EXISTS (SELECT FROM menu WHERE id = menu_org.menu_id AND path = %L)
+	LIMIT 1
+', _menu_path);
+ELSE 
+_query = FORMAT('
+	SELECT mo.org_id
+	FROM menu_org mo
+	INNER JOIN menu m ON m.id = mo.menu_id AND m.path=%L
+	INNER JOIN role_detail rd ON rd.menu_org_id = mo.id
+	INNER JOIN assignment_role amr ON amr.role_id = rd.role_id AND amr.user_id = %L
+	LIMIT 1
+', _menu_path, _user_id);
+END IF;
+
+EXECUTE _query INTO ret_val;
+RETURN ret_val;
+END;
+$$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;

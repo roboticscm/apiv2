@@ -45,6 +45,12 @@ public class TaskReq extends TskTask {
 	@Transient
 	private ArrayList<Long> insertTargetTeams;
 	
+	@Transient
+	private ArrayList<TskStatusDetail> removeAssigneeStatusDetails;
+	@Transient
+	private ArrayList<TskStatusDetail> insertAssigneeStatusDetails;
+	@Transient
+	private ArrayList<TskStatusDetail> editAssigneeStatusDetails;
 	
 	@Transient
 	private ArrayList<TskStatusDetail> removeAssignerStatusDetails;

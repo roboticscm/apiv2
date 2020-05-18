@@ -26,12 +26,15 @@ public class GenericEntity {
     private Long updatedDate;
     private Long deletedBy;
     private Long deletedDate;
+    private Long accessDate = SDate.now();
     private Integer version = 1;
     private Boolean disabled = false;
 
     public void updatedBy(Long userId) {
         setUpdatedBy(userId);
-        setUpdatedDate(SDate.now());
+        var now = SDate.now();
+        setUpdatedDate(now);
+        setAccessDate(now);
     }
 
     public void createdBy(Long userId) {
@@ -40,7 +43,9 @@ public class GenericEntity {
 
     public void deletedBy(Long userId) {
         setDeletedBy(userId);
-        setDeletedDate(SDate.now());
+        var now = SDate.now();
+        setDeletedDate(now);
+        setAccessDate(now);
     }
 
     public void cloneParent(Object source) {

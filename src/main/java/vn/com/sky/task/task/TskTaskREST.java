@@ -2,6 +2,7 @@ package vn.com.sky.task.task;
 
 import static org.springframework.web.reactive.function.server.RequestPredicates.GET;
 import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
+import static org.springframework.web.reactive.function.server.RequestPredicates.PUT;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 import static org.springframework.web.reactive.function.server.ServerResponse.badRequest;
 
@@ -48,6 +49,7 @@ public class TskTaskREST extends GenericREST {
     @Bean
     public RouterFunction<?> tskTaskRoutes() {
         return route(POST(buildURL(Constants.API_TASK_PREFIX, "task", this::saveOrUpdate)), this::saveOrUpdate)
+        		.andRoute(PUT(buildURL(Constants.API_TASK_PREFIX, "task", this::submitOrCancelSubmit)), this::submitOrCancelSubmit)
         		.andRoute(GET(buildURL(Constants.API_TASK_PREFIX, "task", this::tskFindTasks)), this::tskFindTasks)
         		.andRoute(GET(buildURL(Constants.API_TASK_PREFIX, "task", this::tskGetTaskById)), this::tskGetTaskById);
     }
@@ -155,6 +157,64 @@ public class TskTaskREST extends GenericREST {
 
         return Flux.concat(validateName).collectList();
     }
+    
+    
+    
+    private Mono<ServerResponse> submitOrCancelSubmit(ServerRequest request) {
+        // SYSTEM BLOCK CODE
+        // PLEASE DO NOT EDIT
+        if (request == null) {
+            String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+            return Mono.just(new MyServerResponse(methodName));
+        }
+        // END SYSTEM BLOCK CODE
+
+//		return request.body(BodyExtractors.toFormData()).flatMap(item->{
+//        			System.out.println(item);
+//        			return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue("OK");
+//        		});
+        
+        return request
+                .bodyToMono(TskStatusDetail.class).flatMap(req -> {
+                	return statusDetailRepo.findById(req.getId()).flatMap(found -> {
+                		found.setStartTime(req.getStartTime());
+                		found.setEndTime(req.getEndTime());
+                		found.setStatusId(req.getStatusId());
+                		found.setVerificationId(req.getVerificationId());
+                		found.setNote(req.getNote());
+                		
+                		
+                		
+                		if(found.getSubmitStatus() == 1) {
+                			found.setSubmitStatus(0);
+                		} else {
+                			found.setSubmitStatus(1);
+                		}
+                		
+                		return updateEntity(statusDetailRepo, found, auth).flatMap(updated -> {
+                			Mono<Void> deleteStatusDetailAttachFile$ = Mono.empty();
+                			if(req.getRemoveAttachFiles() != null && req.getRemoveAttachFiles().size() > 0) {
+                				deleteStatusDetailAttachFile$ = statusAttachFileRepo.deleteByStatusDetailId(updated.getId(), req.getRemoveAttachFiles());
+                			}
+                			
+                			var saveStatusDetailAttachFile$ =  saveStatusDetailAttachFile (req.getId(), req.getInsertAttachFiles());
+                			
+                			return Flux.concat(deleteStatusDetailAttachFile$, saveStatusDetailAttachFile$).collectList()
+                					.then(updateTaskAccessDate(req.getTaskId()))
+                					.map(res -> updated).flatMap(res -> ok(res, TskStatusDetail.class));
+                		});
+                	}).switchIfEmpty(updateTaskAccessDate(req.getTaskId())
+                			.then(saveAndSubmitStatusDetail(req))
+                			.flatMap(res -> ok(res, TskStatusDetail.class))
+                	);
+                });
+    }
+  
+    private Mono<TskTask> updateTaskAccessDate(Long taskId) {
+    	return mainRepo.findById(taskId).flatMap(found -> {
+    		return updateEntity(mainRepo, found, auth);
+    	});
+    }
 
     private Mono<ServerResponse> saveOrUpdate(ServerRequest request) {
         // SYSTEM BLOCK CODE
@@ -169,7 +229,10 @@ public class TskTaskREST extends GenericREST {
                 .bodyToMono(TaskReq.class)
                 .flatMap(
                     req -> {
-                    	System.out.println(req);
+                    	
+                    	req.setIsFirstRemindered(false);
+                    	req.setIsSecondRemindered(false);
+                    	
                     	
                         // client validation
                         var clientErrors = validate(req);
@@ -233,8 +296,18 @@ public class TskTaskREST extends GenericREST {
     	// Assign Target Team
     	var assignTargetTeam$ = saveAssignOwnerOrg(task.getId(), AssignPosition.TARGET_TEAM.toString(), req.getInsertTargetTeams());
     	
+    	// Assignee status detail 
+    	var assigneeStatusDetail$ = saveStatusDetail(task.getId(), AssignPosition.ASSIGNEE.toString(), req.getInsertAssigneeStatusDetails());
+    	
     	// Assigner status detail 
     	var assignerStatusDetail$ = saveStatusDetail(task.getId(), AssignPosition.ASSIGNER.toString(), req.getInsertAssignerStatusDetails());
+    	
+    	// Update assigner status detail 
+    	var updateSssigneeStatusDetail$ = Flux.empty();
+    	if(req.getEditAssigneeStatusDetails().size() > 0) {
+    		updateSssigneeStatusDetail$ = updateStatusDetail(req.getEditAssigneeStatusDetails());
+        	
+    	}
     	
     	// Update assigner status detail 
     	var updateSssignerStatusDetail$ = Flux.empty();
@@ -243,7 +316,7 @@ public class TskTaskREST extends GenericREST {
         	
     	}
     	
-    	return Flux.concat(taskAttachFile$, assigAssigner$, assignAssignee$, assignEvaluator$, assignChar$, assignTargetPerson$, assignTargetTeam$, assignerStatusDetail$, updateSssignerStatusDetail$).collectList().flatMap(list -> {
+    	return Flux.concat(taskAttachFile$, assigAssigner$, assignAssignee$, assignEvaluator$, assignChar$, assignTargetPerson$, assignTargetTeam$, assigneeStatusDetail$, assignerStatusDetail$, updateSssigneeStatusDetail$, updateSssignerStatusDetail$).collectList().flatMap(list -> {
     		return ok(task, TskTask.class);
     	});
     }
@@ -293,6 +366,13 @@ public class TskTaskREST extends GenericREST {
     		assignTargetTeam$  = assignOwnerOrgRepo.deleteByTaskIdAndPosition(task.getId(), AssignPosition.TARGET_TEAM.toString(), req.getRemoveTargetTeams());
     	}
     	
+    	// Assignee status detail
+    	Mono<Void> assigneeStatusDetail$ = Mono.empty();
+    	if(req.getRemoveAssigneeStatusDetails().size() > 0) {
+    		var ids = req.getRemoveAssigneeStatusDetails().stream().map(it -> it.getId()).collect(Collectors.toList());
+    		assigneeStatusDetail$  = statusDetailRepo.deleteByIds(ids);
+    	}
+    	
     	// Assigner status detail
     	Mono<Void> assignerStatusDetail$ = Mono.empty();
     	if(req.getRemoveAssignerStatusDetails().size() > 0) {
@@ -300,7 +380,7 @@ public class TskTaskREST extends GenericREST {
     		assignerStatusDetail$  = statusDetailRepo.deleteByIds(ids);
     	}
     	
-    	return Flux.concat(taskAttachFile$, assignAssigner$, assignAssignee$, assignEvaluator$, assignChar$, assignTargetPerson$, assignTargetTeam$, assignerStatusDetail$).collectList();
+    	return Flux.concat(taskAttachFile$, assignAssigner$, assignAssignee$, assignEvaluator$, assignChar$, assignTargetPerson$, assignTargetTeam$, assigneeStatusDetail$, assignerStatusDetail$).collectList();
     }
     
     
@@ -354,7 +434,21 @@ public class TskTaskREST extends GenericREST {
     }
     
     
+    private Mono<TskStatusDetail> saveAndSubmitStatusDetail (TskStatusDetail statusDetail) {  	
+    	return Mono.defer(() -> {
+    		statusDetail.setId(null);
+    		statusDetail.setSubmitStatus(1);
+    		return saveEntity(statusDetailRepo, statusDetail, auth).flatMap(savedStatusDetail -> {
+    			return saveStatusDetailAttachFile(savedStatusDetail.getId(), statusDetail.getAttachFiles()).collectList().map(res -> savedStatusDetail);
+    		});
+    	});
+    }
+    
     private Flux<Object> saveStatusDetailAttachFile (Long statusDetailId, ArrayList<String> fileNames) {
+    	if(fileNames == null || fileNames.size() == 0) {
+    		return Flux.empty();
+    	}
+    	
     	var entity = new TskStatusAttachFile();
     	entity.setStatusDetailId(statusDetailId);
     	

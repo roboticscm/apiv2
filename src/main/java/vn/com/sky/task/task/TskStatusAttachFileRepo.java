@@ -13,4 +13,5 @@ import vn.com.sky.task.model.TskStatusAttachFile;
 public interface TskStatusAttachFileRepo extends ReactiveCrudRepository<TskStatusAttachFile, Long> {
 	@Query("delete from tsk_status_attach_file where status_detail_id = :statusDetailId and file_name in (:fileNames)")
 	Mono<Void> deleteByStatusDetailId(Long statusDetailId, ArrayList<String> fileNames);
+	
 }

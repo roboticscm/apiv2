@@ -47,8 +47,8 @@ end if;
 
 if _restore_ids is not null then
 	_query = format('
-		update %s set deleted_by = null, deleted_date = null, updated_by=%L, updated_date=%L where id in (%s)
-	', _table_name, _updated_by, _updated_date, _restore_ids);
+		update %s set deleted_by = null, deleted_date = null, updated_by=%L, updated_date=%L, access_date=%L where id in (%s)
+	', _table_name, _updated_by, _updated_date, _updated_date, _restore_ids);
 end if;
 
 execute _query;
@@ -176,10 +176,10 @@ begin
 if _deleted_ids is not null then
 	_query = format('
 		with rows as (
-			update %s set deleted_by = %L, deleted_date = %L where id in (%s)
+			update %s set deleted_by = %L, deleted_date = %L, access_date = %L where id in (%s)
 		returning 1)
 		select count(*) from rows;
-	', _table_name, _user_id, _deleted_date, _deleted_ids);
+	', _table_name, _user_id, _deleted_date, _deleted_date, _deleted_ids);
 end if;
 
 execute _query into ret_val;

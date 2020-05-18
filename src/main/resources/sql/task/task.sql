@@ -1,3 +1,10 @@
+DROP INDEX tsk_task_idx_01;
+CREATE INDEX tsk_task_idx_01 ON tsk_task (access_date DESC NULLS LAST);
+   
+
+
+
+
 CREATE OR REPLACE FUNCTION tsk_find_tasks(_user_id BIGINT, _menu_path TEXT, _dep_id BIGINT, _page BIGINT, _page_size BIGINT)
 RETURNS TEXT AS $$
 DECLARE 
@@ -7,43 +14,52 @@ DECLARE
 	list_staff TEXT;
 	full_count_query TEXT;
 	payload_query TEXT;
-	order_by TEXT;
+	order_by TEXT = '';
 BEGIN
 list_staff = get_list_staff_ids(_user_id, _menu_path, _dep_id);
+
 IF list_staff IS NULL THEN -- full control
 	data_level_cond = '';
 ELSEIF list_staff = '' THEN -- prevent access
 	data_level_cond = ' AND FALSE ';
 ELSE
-	data_level_cond = ' and t.created_by in (' || list_staff || ')';
+	data_level_cond = format('
+		AND (t.created_by IN (%s) OR EXISTS (SELECT FROM tsk_assign_human_or_org h WHERE task_id = t.id AND human_or_org_id IN (%s) )	)					 
+	', list_staff, list_staff);
 END IF;
+
+
 
 full_count_query = format('
 	SELECT COUNT(*)
 	FROM tsk_task t
-	WHERE t.deleted_by IS NULL
-');
+	WHERE t.deleted_by IS NULL %s 
+', data_level_cond);
 
-payload_query = FORMAT('
-	WITH tmp_payload AS (
-	SELECT t.*
-	FROM tsk_task t
-	WHERE t.deleted_by IS NULL
-	OFFSET %s
-	LIMIT %s
-	)	
-	SELECT t.id, t.name, project.name as "projectName", t.start_time, t.deadline,
-		COALESCE(t.updated_date, t.created_date) AS updated_or_created_date,
-		array_agg(st.name ORDER BY std.start_time DESC) AS "lastStatusName",
+order_by = 'ORDER BY t.access_date DESC NULLS LAST';
+
+payload_query = FORMAT('	
+	SELECT t.id, t.name, project.name as project_name, t.start_time, t.deadline, priority.name as priority_name,
+		t.assignee_start_time, t.assignee_end_time, t.evaluate_time,
+		array_agg(verity.name ORDER BY std.start_time DESC) AS "lastStatusName",
 		array_agg(DISTINCT h_assigner.last_name || '' '' || h_assigner.first_name) AS "assigners",
 		array_agg(DISTINCT h_assignee.last_name || '' '' || h_assignee.first_name) AS "assignees",
 		array_agg(DISTINCT h_evaluator.last_name || '' '' || h_evaluator.first_name) AS "evaluators"
-	FROM tmp_payload t
+	FROM (
+		SELECT t.*
+		FROM tsk_task t
+		WHERE t.deleted_by IS NULL %s
+		%s
+		OFFSET %s
+		LIMIT %s 
+	) t
 
 	LEFT JOIN tsk_project project ON project.id = t.project_id
+					   
+	LEFT JOIN tsk_priority priority ON priority.id = t.priority_id
 
-	LEFT JOIN tsk_status_detail std ON std.task_id = t.id
-	LEFT JOIN tsk_status st ON st.id = std.status_id
+	LEFT JOIN tsk_status_detail std ON std.task_id = t.id AND std.submit_status = 1
+	LEFT JOIN tsk_task_verification verity ON verity.id = std.verification_id
 
 	LEFT JOIN tsk_assign_human_or_org a_asigner ON a_asigner.task_id = t.id AND a_asigner.assign_position=%L
 	LEFT JOIN human_or_org h_assigner ON h_assigner.id = a_asigner.human_or_org_id
@@ -53,17 +69,14 @@ payload_query = FORMAT('
 
 	LEFT JOIN tsk_assign_human_or_org a_evaluator ON a_evaluator.task_id = t.id AND a_evaluator.assign_position=%L
 	LEFT JOIN human_or_org h_evaluator ON h_evaluator.id = a_evaluator.human_or_org_id
+	GROUP BY t.id, t.name, project.name, t.start_time, t.deadline, t.access_date, priority.name,
+		t.assignee_start_time, t.assignee_end_time, t.evaluate_time
+	%s
+', data_level_cond, order_by, (_page - 1)*_page_size, _page_size, 'ASSIGNER', 'ASSIGNEE', 'EVALUATOR', order_by);
 
-	GROUP BY t.id, t.name, project.name, t.start_time, t.deadline, t.updated_date, t.created_date
-					  
-', (_page - 1)*_page_size, _page_size, 'ASSIGNER', 'ASSIGNEE', 'EVALUATOR');
-
-order_by = 'ORDER BY updated_or_created_date DESC';
-
-RETURN  paginate(full_count_query, payload_query, order_by);
+RETURN  sys_build_json(full_count_query, payload_query);
 END;
 $$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
-
 
 
 
@@ -75,7 +88,7 @@ DECLARE
 BEGIN
 _query = FORMAT('SELECT COALESCE(json_agg(t), ''[]'')::TEXT 
 FROM(
-	SELECT t.*, 
+	SELECT t.*, creator.last_name || '' '' || creator.first_name as "creatorFullName",
 		array_agg(distinct taf.file_name) AS "taskAttachFiles",
 		array_agg(distinct jsonb_build_object(''id'', assigner.human_or_org_id, ''name'', h_assigner.last_name || '' '' || h_assigner.first_name)) AS "assigners",
 		array_agg(distinct jsonb_build_object(''id'', assignee.human_or_org_id, ''name'', h_assignee.last_name || '' '' || h_assignee.first_name)) AS "assignees",
@@ -83,11 +96,18 @@ FROM(
 		array_agg(distinct jsonb_build_object(''id'', char.owner_org_id, ''name'', o_char.name)) as "chars",
 		array_agg(distinct jsonb_build_object(''id'', target_person.human_or_org_id, ''name'', h_target_person.last_name || '' '' || h_target_person.first_name)) AS "targetPersons",
 		array_agg(distinct jsonb_build_object(''id'', target_team.owner_org_id, ''name'', o_target_team.name)) as "targetTeams",
-		array_agg(jsonb_build_object(''index'', assigner_status_detail.id, ''id'', assigner_status_detail.id, ''taskId'', assigner_status_detail.task_id, ''statusId'', assigner_status.id, ''status'', assigner_status.name, ''startTime'', assigner_status_detail.start_time, ''endTime'', assigner_status_detail.end_time, ''note'', assigner_status_detail.note,
-				''attachFiles'', (SELECT array_agg(file_name) FROM tsk_status_attach_file WHERE status_detail_id=assigner_status_detail.id)
 				
+		array_agg(jsonb_build_object(''index'', assignee_status_detail.id, ''id'', assignee_status_detail.id, ''taskId'', assignee_status_detail.task_id, ''verificationId'', assignee_verify.id, ''status'', assignee_verify.name, ''percent'', assignee_verify.percent, ''startTime'', assignee_status_detail.start_time, ''endTime'', assignee_status_detail.end_time, ''note'', assignee_status_detail.note, ''submitStatus'', assignee_status_detail.submit_status,
+				''attachFiles'', (SELECT array_agg(file_name) FROM tsk_status_attach_file WHERE status_detail_id=assignee_status_detail.id)
+		) ORDER BY assignee_status_detail.start_time) AS "assigneeStatusDetails",
+				
+		array_agg(jsonb_build_object(''index'', assigner_status_detail.id, ''id'', assigner_status_detail.id, ''taskId'', assigner_status_detail.task_id, ''statusId'', assigner_status.id, ''status'', assigner_status.name, ''startTime'', assigner_status_detail.start_time, ''endTime'', assigner_status_detail.end_time, ''note'', assigner_status_detail.note, ''submitStatus'', assigner_status_detail.submit_status,
+				''attachFiles'', (SELECT array_agg(file_name) FROM tsk_status_attach_file WHERE status_detail_id=assigner_status_detail.id)
 		) ORDER BY assigner_status_detail.start_time) AS "assignerStatusDetails"
+				
 	FROM tsk_task t
+				
+	LEFT JOIN human_or_org creator ON creator.id = t.created_by
 				
 	LEFT JOIN tsk_task_attach_file taf ON taf.task_id = t.id
 				
@@ -109,12 +129,15 @@ FROM(
 	LEFT JOIN tsk_assign_owner_org target_team ON target_team.task_id = t.id AND target_team.assign_position=%L
 	LEFT JOIN owner_org o_target_team ON o_target_team.id = target_team.owner_org_id
 				
+	LEFT JOIN tsk_status_detail assignee_status_detail ON assignee_status_detail.task_id = t.id AND assignee_status_detail.assign_position=%L
+	LEFT JOIN tsk_task_verification assignee_verify ON assignee_verify.id = assignee_status_detail.verification_id
+				
 	LEFT JOIN tsk_status_detail assigner_status_detail ON assigner_status_detail.task_id = t.id AND assigner_status_detail.assign_position=%L
 	LEFT JOIN tsk_status assigner_status ON assigner_status.id = assigner_status_detail.status_id
 				
 	WHERE t.id = %L
-	GROUP BY t.id
-) as t', 'ASSIGNER', 'ASSIGNEE', 'EVALUATOR', 'CHAR', 'TARGET_PERSON', 'TARGET_TEAM', 'ASSIGNER', _id );
+	GROUP BY t.id, "creatorFullName"
+) as t', 'ASSIGNER', 'ASSIGNEE', 'EVALUATOR', 'CHAR', 'TARGET_PERSON', 'TARGET_TEAM', 'ASSIGNEE', 'ASSIGNER', _id );
 
 EXECUTE _query INTO ret_val;
 RETURN  ret_val;

@@ -19,16 +19,18 @@ public class TskTask extends GenericEntity {
 	private Long startTime;
 	private Long deadline;
 	private Long firstReminder;
+	private Boolean isFirstRemindered = false;
 	private Long secondReminder;
+	private Boolean isSecondRemindered = false;
 	private Long assigneeStartTime;
 	private Boolean assigneeStartConfirm = false;
 	private Long assigneeEndTime;
 	private Boolean assigneeEndConfirm = false;
-	private Long evaluateDate;
+	private Long evaluateTime;
 	private String evaluateComment;
-	private Long evaluateQualification;
-	private Long evaluateVerification;
-	private Long evaluateStatus;
+	private Long evaluateQualificationId;
+	private Long evaluateVerificationId;
+	private Long evaluateStatusId;
 	private Boolean evaluateComplete = false;
     private Integer submitStatus = 0;
 
