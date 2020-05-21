@@ -19,7 +19,6 @@ import lombok.AllArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.model.Role;
 import vn.com.sky.util.CustomRepoUtil;
 import vn.com.sky.util.LinkedHashMapUtil;
@@ -37,8 +36,6 @@ public class RoleREST extends GenericREST {
     @Autowired
     private RoleRepo mainRepo;
 
-    @Autowired
-    private AuthenticationManager auth;
 
     @Bean
     public RouterFunction<?> roleRoutes() {
@@ -170,7 +167,7 @@ public class RoleREST extends GenericREST {
                                     if (errs.size() > 0) {
                                         return error(LinkedHashMapUtil.fromArrayList(errs));
                                     } else {
-                                        return saveEntity(mainRepo, roleReq, auth).flatMap(e -> ok(e, Role.class));
+                                        return saveEntity(mainRepo, roleReq, getUserId(request)).flatMap(e -> ok(e, Role.class));
                                     }
                                 }
                             );
@@ -181,7 +178,7 @@ public class RoleREST extends GenericREST {
                                     if (errs.size() > 0) {
                                         return error(LinkedHashMapUtil.fromArrayList(errs));
                                     } else {
-                                        return updateEntity(mainRepo, roleReq, auth).flatMap(e -> ok(e, Role.class));
+                                        return updateEntity(mainRepo, roleReq, getUserId(request)).flatMap(e -> ok(e, Role.class));
                                     }
                                 }
                             );

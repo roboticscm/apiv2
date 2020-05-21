@@ -23,7 +23,6 @@ import reactor.core.publisher.Mono;
 import vn.com.sky.Constants;
 import vn.com.sky.Message;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.task.model.AssignPosition;
 import vn.com.sky.task.model.TskAssignHumanOrOrg;
 import vn.com.sky.task.model.TskAssignOwnerOrg;
@@ -38,7 +37,6 @@ import vn.com.sky.util.MyServerResponse;
 @AllArgsConstructor
 public class TskTaskREST extends GenericREST {
     private TskTaskRepo mainRepo;
-    private AuthenticationManager auth;
     private CustomTaskRepo customRepo;
     private TskTaskAttachFileRepo attachFileRepo;
     private TskAssignHumanOrOrgRepo assignHumanRepo;
@@ -81,10 +79,37 @@ public class TskTaskREST extends GenericREST {
 			return badRequest().bodyValue(Message.INVALID_ID);
 		}
         
+		var textSearch = getParam(request, "textSearch");
+		var taskName = getParam(request, "taskName");
+		var projectName = getParam(request, "projectName");
+		var assigneeName = getParam(request, "assigneeName");
+		var assignerName = getParam(request, "assignerName");
+		var evaluatorName = getParam(request, "evaluatorName");
+		Boolean isCompleted = null, isDelayDeadline = null;
+		Long createdDateFrom = null, createdDateTo = null;
+		try {
+			isCompleted = getBoolParam(request, "isCompleted");
+			isDelayDeadline = getBoolParam(request, "isDelayDeadline");
+			createdDateFrom = getLongParam(request, "createdDateFrom");
+			createdDateTo = getLongParam(request, "createdDateTo");
+		} catch (Exception e) {
+		}
+				
+	
         try {
             return customRepo
-                .tskFindTasks(auth.getUserId(), menuPath, departmentId, page, pageSize)
-                .flatMap(item -> ok(item))
+                .tskFindTasks(getUserId(request), menuPath, departmentId, page, pageSize,
+                		textSearch, 
+                		taskName,
+                		projectName,
+                		assigneeName,
+                		assignerName,
+                		evaluatorName,
+                		isCompleted,
+                		isDelayDeadline,
+                		createdDateFrom,
+                		createdDateTo
+                ).flatMap(item -> ok(item))
                 .onErrorResume(e -> error(e));
         } catch (Exception e) {
             e.printStackTrace();
@@ -191,28 +216,28 @@ public class TskTaskREST extends GenericREST {
                 			found.setSubmitStatus(1);
                 		}
                 		
-                		return updateEntity(statusDetailRepo, found, auth).flatMap(updated -> {
+                		return updateEntity(statusDetailRepo, found, getUserId(request)).flatMap(updated -> {
                 			Mono<Void> deleteStatusDetailAttachFile$ = Mono.empty();
                 			if(req.getRemoveAttachFiles() != null && req.getRemoveAttachFiles().size() > 0) {
                 				deleteStatusDetailAttachFile$ = statusAttachFileRepo.deleteByStatusDetailId(updated.getId(), req.getRemoveAttachFiles());
                 			}
                 			
-                			var saveStatusDetailAttachFile$ =  saveStatusDetailAttachFile (req.getId(), req.getInsertAttachFiles());
+                			var saveStatusDetailAttachFile$ =  saveStatusDetailAttachFile (getUserId(request), req.getId(), req.getInsertAttachFiles());
                 			
                 			return Flux.concat(deleteStatusDetailAttachFile$, saveStatusDetailAttachFile$).collectList()
-                					.then(updateTaskAccessDate(req.getTaskId()))
+                					.then(updateTaskAccessDate(getUserId(request), req.getTaskId()))
                 					.map(res -> updated).flatMap(res -> ok(res, TskStatusDetail.class));
                 		});
-                	}).switchIfEmpty(updateTaskAccessDate(req.getTaskId())
-                			.then(saveAndSubmitStatusDetail(req))
+                	}).switchIfEmpty(updateTaskAccessDate(getUserId(request), req.getTaskId())
+                			.then(saveAndSubmitStatusDetail(getUserId(request), req))
                 			.flatMap(res -> ok(res, TskStatusDetail.class))
                 	);
                 });
     }
   
-    private Mono<TskTask> updateTaskAccessDate(Long taskId) {
+    private Mono<TskTask> updateTaskAccessDate(Long userId, Long taskId) {
     	return mainRepo.findById(taskId).flatMap(found -> {
-    		return updateEntity(mainRepo, found, auth);
+    		return updateEntity(mainRepo, found, userId);
     	});
     }
 
@@ -245,8 +270,8 @@ public class TskTaskREST extends GenericREST {
                                         if (errs.size() > 0) {
                                             return error(LinkedHashMapUtil.fromArrayList(errs));
                                         } else {
-                                            return saveEntity(mainRepo, req, auth).flatMap(savedTask -> {
-                                            	return saveRelation(savedTask, req);
+                                            return saveEntity(mainRepo, req, getUserId(request)).flatMap(savedTask -> {
+                                            	return saveRelation(getUserId(request), savedTask, req);
                                            
                                             });
                                         }
@@ -259,9 +284,9 @@ public class TskTaskREST extends GenericREST {
                                         if (errs.size() > 0) {
                                             return error(LinkedHashMapUtil.fromArrayList(errs));
                                         } else {
-                                            return updateEntity(mainRepo, req, auth).flatMap(updatedTask -> {
+                                            return updateEntity(mainRepo, req, getUserId(request)).flatMap(updatedTask -> {
                                             	return deleteRelation(updatedTask, req).flatMap((e) -> {
-                                            		return saveRelation(updatedTask, req);
+                                            		return saveRelation(getUserId(request), updatedTask, req);
                                             	});
                                             });
                                         }
@@ -272,47 +297,47 @@ public class TskTaskREST extends GenericREST {
                 );
     }
     
-    private Mono<ServerResponse> saveRelation (TskTask task, TaskReq req) {
+    private Mono<ServerResponse> saveRelation (Long userId, TskTask task, TaskReq req) {
     	// Task attach file
-    	var taskAttachFile$  = saveTaskAttachFile(task.getId(), req.getInsertTaskAttachFiles());
+    	var taskAttachFile$  = saveTaskAttachFile(userId, task.getId(), req.getInsertTaskAttachFiles());
     	
     	// Assign assigner
-    	var assigAssigner$ = saveAssignHumanOrOrg(task.getId(), AssignPosition.ASSIGNER.toString(), req.getInsertAssigners());
+    	var assigAssigner$ = saveAssignHumanOrOrg(userId, task.getId(), AssignPosition.ASSIGNER.toString(), req.getInsertAssigners());
     	
     	// Assign assignee
-    	var assignAssignee$ = saveAssignHumanOrOrg(task.getId(), AssignPosition.ASSIGNEE.toString(), req.getInsertAssignees());
+    	var assignAssignee$ = saveAssignHumanOrOrg(userId, task.getId(), AssignPosition.ASSIGNEE.toString(), req.getInsertAssignees());
     	
     	
     	// Assign evaluator
-    	var assignEvaluator$ = saveAssignHumanOrOrg(task.getId(), AssignPosition.EVALUATOR.toString(), req.getInsertEvaluators());
+    	var assignEvaluator$ = saveAssignHumanOrOrg(userId, task.getId(), AssignPosition.EVALUATOR.toString(), req.getInsertEvaluators());
     	
     	// Assign characteristic task
-    	var assignChar$ = saveAssignOwnerOrg(task.getId(), AssignPosition.CHAR.toString(), req.getInsertChars());
+    	var assignChar$ = saveAssignOwnerOrg(userId, task.getId(), AssignPosition.CHAR.toString(), req.getInsertChars());
     	
     	
     	// Assign Target Person
-    	var assignTargetPerson$ = saveAssignHumanOrOrg(task.getId(), AssignPosition.TARGET_PERSON.toString(), req.getInsertTargetPersons());
+    	var assignTargetPerson$ = saveAssignHumanOrOrg(userId, task.getId(), AssignPosition.TARGET_PERSON.toString(), req.getInsertTargetPersons());
     	
     	// Assign Target Team
-    	var assignTargetTeam$ = saveAssignOwnerOrg(task.getId(), AssignPosition.TARGET_TEAM.toString(), req.getInsertTargetTeams());
+    	var assignTargetTeam$ = saveAssignOwnerOrg(userId, task.getId(), AssignPosition.TARGET_TEAM.toString(), req.getInsertTargetTeams());
     	
     	// Assignee status detail 
-    	var assigneeStatusDetail$ = saveStatusDetail(task.getId(), AssignPosition.ASSIGNEE.toString(), req.getInsertAssigneeStatusDetails());
+    	var assigneeStatusDetail$ = saveStatusDetail(userId, task.getId(), AssignPosition.ASSIGNEE.toString(), req.getInsertAssigneeStatusDetails());
     	
     	// Assigner status detail 
-    	var assignerStatusDetail$ = saveStatusDetail(task.getId(), AssignPosition.ASSIGNER.toString(), req.getInsertAssignerStatusDetails());
+    	var assignerStatusDetail$ = saveStatusDetail(userId, task.getId(), AssignPosition.ASSIGNER.toString(), req.getInsertAssignerStatusDetails());
     	
     	// Update assigner status detail 
     	var updateSssigneeStatusDetail$ = Flux.empty();
     	if(req.getEditAssigneeStatusDetails().size() > 0) {
-    		updateSssigneeStatusDetail$ = updateStatusDetail(req.getEditAssigneeStatusDetails());
+    		updateSssigneeStatusDetail$ = updateStatusDetail(userId, req.getEditAssigneeStatusDetails());
         	
     	}
     	
     	// Update assigner status detail 
     	var updateSssignerStatusDetail$ = Flux.empty();
     	if(req.getEditAssignerStatusDetails().size() > 0) {
-    		updateSssignerStatusDetail$ = updateStatusDetail(req.getEditAssignerStatusDetails());
+    		updateSssignerStatusDetail$ = updateStatusDetail(userId,  req.getEditAssignerStatusDetails());
         	
     	}
     	
@@ -384,67 +409,67 @@ public class TskTaskREST extends GenericREST {
     }
     
     
-    private Flux<Object> saveTaskAttachFile (Long taskId, ArrayList<String> fileNames) {
+    private Flux<Object> saveTaskAttachFile (Long userId, Long taskId, ArrayList<String> fileNames) {
     	var entity = new TskTaskAttachFile();
     	entity.setTaskId(taskId);
     	
     	return Flux.fromIterable(fileNames).flatMap(fileName -> {
     		entity.setFileName(fileName);
-    		return saveEntity(attachFileRepo, entity, auth);
+    		return saveEntity(attachFileRepo, entity, userId);
     	});
     	
     }
     
     
-    private Flux<Object> saveAssignHumanOrOrg (Long taskId, String assignPosition, ArrayList<Long> humanIds) {
+    private Flux<Object> saveAssignHumanOrOrg (Long userId, Long taskId, String assignPosition, ArrayList<Long> humanIds) {
     	var entity = new TskAssignHumanOrOrg();
     	entity.setTaskId(taskId);
     	entity.setAssignPosition(assignPosition);
     	
     	return Flux.fromIterable(humanIds).flatMap(humanId -> {
     		entity.setHumanOrOrgId(humanId);
-    		return saveEntity(assignHumanRepo, entity, auth);
+    		return saveEntity(assignHumanRepo, entity, userId);
     	});
     	
     }
     
-    private Flux<Object> saveAssignOwnerOrg (Long taskId, String assignPosition, ArrayList<Long> ownerOrgIds) {
+    private Flux<Object> saveAssignOwnerOrg (Long userId, Long taskId, String assignPosition, ArrayList<Long> ownerOrgIds) {
     	var entity = new TskAssignOwnerOrg();
     	entity.setTaskId(taskId);
     	entity.setAssignPosition(assignPosition);
     	
     	return Flux.fromIterable(ownerOrgIds).flatMap(ownerOrgId -> {
     		entity.setOwnerOrgId(ownerOrgId);
-    		return saveEntity(assignOwnerOrgRepo, entity, auth);
+    		return saveEntity(assignOwnerOrgRepo, entity, userId);
     	});
     	
     }
     
     
-    private Flux<Object> saveStatusDetail (Long taskId, String assignPosition, ArrayList<TskStatusDetail> statusDetails) {  	
+    private Flux<Object> saveStatusDetail (Long userId, Long taskId, String assignPosition, ArrayList<TskStatusDetail> statusDetails) {  	
     	return Flux.fromIterable(statusDetails).flatMap(statusDetail -> {
     		statusDetail.setId(null);
     		statusDetail.setTaskId(taskId);
     		statusDetail.setAssignPosition(assignPosition);
-    		return saveEntity(statusDetailRepo, statusDetail, auth).flatMapMany(savedStatusDetail -> {
-    			return saveStatusDetailAttachFile(savedStatusDetail.getId(), statusDetail.getAttachFiles());
+    		return saveEntity(statusDetailRepo, statusDetail, userId).flatMapMany(savedStatusDetail -> {
+    			return saveStatusDetailAttachFile(userId, savedStatusDetail.getId(), statusDetail.getAttachFiles());
     		});
     	});
     	
     }
     
     
-    private Mono<TskStatusDetail> saveAndSubmitStatusDetail (TskStatusDetail statusDetail) {  	
+    private Mono<TskStatusDetail> saveAndSubmitStatusDetail (Long userId, TskStatusDetail statusDetail) {  	
     	return Mono.defer(() -> {
     		statusDetail.setId(null);
     		statusDetail.setSubmitStatus(1);
-    		return saveEntity(statusDetailRepo, statusDetail, auth).flatMap(savedStatusDetail -> {
-    			return saveStatusDetailAttachFile(savedStatusDetail.getId(), statusDetail.getAttachFiles()).collectList().map(res -> savedStatusDetail);
+    		return saveEntity(statusDetailRepo, statusDetail, userId).flatMap(savedStatusDetail -> {
+    			return saveStatusDetailAttachFile(userId, savedStatusDetail.getId(), statusDetail.getAttachFiles()).collectList().map(res -> savedStatusDetail);
     		});
     	});
     }
     
-    private Flux<Object> saveStatusDetailAttachFile (Long statusDetailId, ArrayList<String> fileNames) {
+    private Flux<Object> saveStatusDetailAttachFile (Long userId, Long statusDetailId, ArrayList<String> fileNames) {
     	if(fileNames == null || fileNames.size() == 0) {
     		return Flux.empty();
     	}
@@ -454,13 +479,13 @@ public class TskTaskREST extends GenericREST {
     	
     	return Flux.fromIterable(fileNames).flatMap(fileName -> {
     		entity.setFileName(fileName);
-    		return saveEntity(statusAttachFileRepo, entity, auth);
+    		return saveEntity(statusAttachFileRepo, entity, userId);
     	});
     	
     }
     
     
-    private Flux<Object> updateStatusDetail (ArrayList<TskStatusDetail> statusDetails) {  	
+    private Flux<Object> updateStatusDetail (Long userId, ArrayList<TskStatusDetail> statusDetails) {  	
     	return Flux.fromIterable(statusDetails).flatMap(statusDetail -> {
     		return statusDetailRepo.findById(statusDetail.getId()).flatMap(found -> {
     			found.setStartTime(statusDetail.getStartTime());
@@ -477,7 +502,7 @@ public class TskTaskREST extends GenericREST {
     			
     			found.setNote(statusDetail.getNote());
     			
-    			return updateEntity(statusDetailRepo, found, auth).flatMap(updated -> {
+    			return updateEntity(statusDetailRepo, found, userId).flatMap(updated -> {
     				
     				Mono<Void> deleteStatusAttachFile$ = Mono.empty();
     				if(statusDetail.getRemoveAttachFiles().size() > 0) {
@@ -486,7 +511,7 @@ public class TskTaskREST extends GenericREST {
     				
     				var saveStatusAttachFile$ = Flux.empty();
     				if (statusDetail.getInsertAttachFiles().size() > 0) {
-    					saveStatusAttachFile$ = saveStatusDetailAttachFile(updated.getId(), statusDetail.getInsertAttachFiles());
+    					saveStatusAttachFile$ = saveStatusDetailAttachFile(userId, updated.getId(), statusDetail.getInsertAttachFiles());
     				}
     				
     				return Flux.concat(deleteStatusAttachFile$, saveStatusAttachFile$).collectList();

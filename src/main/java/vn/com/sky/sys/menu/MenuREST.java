@@ -11,16 +11,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import lombok.AllArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import lombok.AllArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.menuorg.MenuOrgRepo;
 import vn.com.sky.sys.model.Menu;
 import vn.com.sky.sys.model.MenuOrg;
@@ -32,7 +33,6 @@ import vn.com.sky.util.MyServerResponse;
 public class MenuREST extends GenericREST {
     private MenuRepo mainRepo;
     private CustomMenuRepo customRepo;
-    private AuthenticationManager auth;
     private MenuOrgRepo menuOrgRepo;
     private CustomRepoUtil utilRepo;
 
@@ -133,7 +133,7 @@ public class MenuREST extends GenericREST {
 
         var depIdStr = request.queryParam("depId").orElse(null);
 
-        Long userId = auth.getUserId(), depId = null;
+        Long userId = getUserId(request), depId = null;
         Boolean includeDeleted = false, includeDisabled = false;
 
         try {
@@ -201,7 +201,7 @@ public class MenuREST extends GenericREST {
         }
 
         return customRepo
-            .sysGetRoledMenuPathListByUserId(auth.getUserId(), includeDeleted, includeDisabled)
+            .sysGetRoledMenuPathListByUserId(getUserId(request), includeDeleted, includeDisabled)
             .flatMap(item -> ok(item))
             .onErrorResume(e -> error(e));
     }
@@ -217,7 +217,7 @@ public class MenuREST extends GenericREST {
 
         var depIdStr = request.queryParam("depId").orElse(null);
 
-        Long userId = auth.getUserId(), depId = null;
+        Long userId = getUserId(request), depId = null;
         Boolean includeDeleted = false, includeDisabled = false;
 
         try {
@@ -241,7 +241,7 @@ public class MenuREST extends GenericREST {
             .onErrorResume(e -> error(e));
     }
 
-    private Mono<ServerResponse> save(LinkedHashMap<String, String> serverError, MenuReq menuReq) {
+    private Mono<ServerResponse> save(ServerRequest request, LinkedHashMap<String, String> serverError, MenuReq menuReq) {
         return utilRepo
             .isTextValueExisted("menu", "name", menuReq.getName())
             .flatMap(
@@ -260,10 +260,10 @@ public class MenuREST extends GenericREST {
                                 if (serverError.size() > 0) {
                                     return error(serverError);
                                 } else {
-                                    return saveEntity(mainRepo, menuReq, auth)
+                                    return saveEntity(mainRepo, menuReq, getUserId(request))
                                         .flatMap(
                                             savedMenu -> {
-                                                return saveManyMenuOrg(savedMenu.getId(), menuReq.getInsertDepIds())
+                                                return saveManyMenuOrg(getUserId(request), savedMenu.getId(), menuReq.getInsertDepIds())
                                                     .flatMap(item -> ok(item, Menu.class))
                                                     .then(
                                                         deleteManyMenuOrg(savedMenu.getId(), menuReq.getDeleteDepIds())
@@ -278,7 +278,7 @@ public class MenuREST extends GenericREST {
             );
     }
 
-    private Mono<ServerResponse> update(LinkedHashMap<String, String> serverError, MenuReq menuReq) {
+    private Mono<ServerResponse> update(ServerRequest request, LinkedHashMap<String, String> serverError, MenuReq menuReq) {
         return utilRepo
             .isTextValueDuplicated("menu", "name", menuReq.getName(), menuReq.getId())
             .flatMap(
@@ -298,10 +298,10 @@ public class MenuREST extends GenericREST {
                                 if (serverError.size() > 0) {
                                     return error(serverError);
                                 } else {
-                                    return updateEntity(mainRepo, menuReq, auth)
+                                    return updateEntity(mainRepo, menuReq, getUserId(request))
                                         .flatMap(
                                             updatedMenu -> {
-                                                return saveManyMenuOrg(updatedMenu.getId(), menuReq.getInsertDepIds())
+                                                return saveManyMenuOrg(getUserId(request), updatedMenu.getId(), menuReq.getInsertDepIds())
                                                     .flatMap(item -> ok(item, Menu.class))
                                                     .then(
                                                         deleteManyMenuOrg(
@@ -339,9 +339,9 @@ public class MenuREST extends GenericREST {
                     var serverError = new LinkedHashMap<String, String>();
 
                     if (menuReq.getId() == null) { // save
-                        return save(serverError, menuReq);
+                        return save(request, serverError, menuReq);
                     } else { // update
-                        return update(serverError, menuReq);
+                        return update(request, serverError, menuReq);
                     }
                 }
             );
@@ -362,7 +362,7 @@ public class MenuREST extends GenericREST {
         }
     }
 
-    private Mono<List<MenuOrg>> saveManyMenuOrg(Long menuId, ArrayList<Long> depIds) {
+    private Mono<List<MenuOrg>> saveManyMenuOrg(Long userId, Long menuId, ArrayList<Long> depIds) {
         if (depIds == null) {
             return Mono.empty();
         } else {
@@ -372,18 +372,18 @@ public class MenuREST extends GenericREST {
                     depId -> {
                         return menuOrgRepo
                             .findByMenuIdAndOrgId(menuId, depId)
-                            .switchIfEmpty(doSaveMenuOrg(menuId, depId));
+                            .switchIfEmpty(doSaveMenuOrg(userId, menuId, depId));
                     }
                 )
                 .collectList();
         }
     }
 
-    private Mono<MenuOrg> doSaveMenuOrg(Long menuId, Long depId) {
+    private Mono<MenuOrg> doSaveMenuOrg(Long userId, Long menuId, Long depId) {
         var menuOrg = new MenuOrg();
         menuOrg.setOrgId(depId);
         menuOrg.setMenuId(menuId);
-        return saveEntity(menuOrgRepo, menuOrg, auth);
+        return saveEntity(menuOrgRepo, menuOrg, userId);
     }
 
     private Mono<ServerResponse> deleteMany(ServerRequest request) {
@@ -424,7 +424,7 @@ public class MenuREST extends GenericREST {
                             .findById(id)
                             .flatMap(
                                 foundObj -> {
-                                    return super.softDeleteEntity(mainRepo, foundObj, auth);
+                                    return super.softDeleteEntity(mainRepo, foundObj, getUserId(request));
                                 }
                             );
                     }

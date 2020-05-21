@@ -35,7 +35,7 @@ public class ReminderService extends GenericREST implements Runnable {
 				firstReminder.forEach(item -> {
 					var humanIds = assignHumanRepo.findHumanIdsByTaskId(item.getId()).collectList().block();
 					item.setIsFirstRemindered(true);
-					updateEntity(taskRepo, item, null).subscribe();
+					updateEntity(taskRepo, item, (Long)null).subscribe();
 					
 					notify(item, humanIds, "First Reminder");
 				});
@@ -47,7 +47,7 @@ public class ReminderService extends GenericREST implements Runnable {
 				secondReminder.forEach(item -> {
 					var humanIds = assignHumanRepo.findHumanIdsByTaskId(item.getId()).collectList().block();
 					item.setIsSecondRemindered(true);
-					updateEntity(taskRepo, item, null).subscribe();
+					updateEntity(taskRepo, item, (Long)null).subscribe();
 					
 					notify(item, humanIds, "Second Reminder");
 				});
@@ -81,7 +81,7 @@ public class ReminderService extends GenericREST implements Runnable {
 			notification.setTargetId(task.getId());
 			notification.setType(NotifyType.ALARM.toString());
 			notification.setTitle(reminderType + ": " + task.getName());
-			saveEntity(notificationRepo, notification, null).subscribe();
+			saveEntity(notificationRepo, notification, (Long)null).subscribe();
 		});
 	}
 

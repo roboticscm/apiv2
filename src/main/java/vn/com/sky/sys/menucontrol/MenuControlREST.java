@@ -4,16 +4,16 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
 import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
-import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import lombok.AllArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.menu.MenuRepo;
 import vn.com.sky.sys.model.MenuControl;
 import vn.com.sky.util.MyServerResponse;
@@ -24,7 +24,6 @@ public class MenuControlREST extends GenericREST {
     private MenuControlRepo mainRepo;
     private CustomMenuControlRepo customRepo;
     private MenuRepo menuRepo;
-    private AuthenticationManager auth;
 
     @Bean
     public RouterFunction<?> menuControlRoutes() {
@@ -87,7 +86,7 @@ public class MenuControlREST extends GenericREST {
                                                         return Mono.empty();
                                                     }
                                                 )
-                                                .switchIfEmpty(saveMenuControl(menuControl, foundMenu.getId()));
+                                                .switchIfEmpty(saveMenuControl(getUserId(request), menuControl, foundMenu.getId()));
                                         }
                                     )
                                     .collectList();
@@ -98,10 +97,10 @@ public class MenuControlREST extends GenericREST {
             .flatMap(res -> ok(res, MenuControl.class));
     }
 
-    private Mono<Void> saveMenuControl(MenuControl menuControl, Long menuId) {
+    private Mono<Void> saveMenuControl(Long userId, MenuControl menuControl, Long menuId) {
         if (menuControl.getChecked()) {
             menuControl.setMenuId(menuId);
-            return super.saveEntity(mainRepo, menuControl, auth).flatMap(ret -> Mono.empty());
+            return super.saveEntity(mainRepo, menuControl, userId).flatMap(ret -> Mono.empty());
         } else {
             return Mono.empty();
         }

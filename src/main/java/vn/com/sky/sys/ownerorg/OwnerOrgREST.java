@@ -19,7 +19,6 @@ import lombok.AllArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.model.OwnerOrg;
 import vn.com.sky.util.CustomRepoUtil;
 import vn.com.sky.util.LinkedHashMapUtil;
@@ -29,7 +28,6 @@ import vn.com.sky.util.MyServerResponse;
 @AllArgsConstructor
 public class OwnerOrgREST extends GenericREST {
     private CustomOwnerOrgRepo customRepo;
-    private AuthenticationManager auth;
     private OwnerOrgRepo mainRepo;
     private CustomRepoUtil utilRepo;
 
@@ -125,7 +123,7 @@ public class OwnerOrgREST extends GenericREST {
                                         if (errs.size() > 0) {
                                             return error(LinkedHashMapUtil.fromArrayList(errs));
                                         } else {
-                                            return saveEntity(mainRepo, req, auth).flatMap(e -> ok(e, OwnerOrg.class));
+                                            return saveEntity(mainRepo, req, getUserId(request)).flatMap(e -> ok(e, OwnerOrg.class));
                                         }
                                     }
                                 );
@@ -136,7 +134,7 @@ public class OwnerOrgREST extends GenericREST {
                                         if (errs.size() > 0) {
                                             return error(LinkedHashMapUtil.fromArrayList(errs));
                                         } else {
-                                            return updateEntity(mainRepo, req, auth).flatMap(e -> ok(e, OwnerOrg.class));
+                                            return updateEntity(mainRepo, req, getUserId(request)).flatMap(e -> ok(e, OwnerOrg.class));
                                         }
                                     }
                                 );
@@ -286,7 +284,7 @@ public class OwnerOrgREST extends GenericREST {
             return Mono.just(new MyServerResponse(methodName));
         }
         // END SYSTEM BLOCK CODE
-        Long userId = auth.getUserId();
+        Long userId = getUserId(request);
         Boolean includeDeleted = false, includeDisabled = false;
 
         try {
@@ -341,16 +339,13 @@ public class OwnerOrgREST extends GenericREST {
         }
         // END SYSTEM BLOCK CODE
 
-        var menuIdStr = request.queryParam("menuId").orElse(null);
-
         Long menuId = null;
-
-        try {
-            if (menuIdStr != null && !"null".equals(menuIdStr)) menuId = Long.parseLong(menuIdStr);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return error("menuId", "SYS.MSG.INVILID_MENU_ID");
-        }
+		try {
+			menuId = getLongParam(request, "menuId");
+		} catch (Exception e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
 
         return customRepo
             .sysGetAvailableDepartmentTreeForMenu(menuId)

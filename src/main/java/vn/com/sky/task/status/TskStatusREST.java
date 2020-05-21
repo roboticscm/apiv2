@@ -17,8 +17,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.Constants;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
-import vn.com.sky.task.model.TskPriority;
 import vn.com.sky.task.model.TskStatus;
 import vn.com.sky.util.LinkedHashMapUtil;
 import vn.com.sky.util.MyServerResponse;
@@ -27,7 +25,6 @@ import vn.com.sky.util.MyServerResponse;
 @AllArgsConstructor
 public class TskStatusREST extends GenericREST {
     private TskStatusRepo mainRepo;
-    private AuthenticationManager auth;
 
     @Bean
     public RouterFunction<?> tskStatusRoutes() {
@@ -120,7 +117,7 @@ public class TskStatusREST extends GenericREST {
                                         if (errs.size() > 0) {
                                             return error(LinkedHashMapUtil.fromArrayList(errs));
                                         } else {
-                                            return saveEntity(mainRepo, req, auth).flatMap(e -> {
+                                            return saveEntity(mainRepo, req, getUserId(request)).flatMap(e -> {
                                             	return ok(e, TskStatus.class);
                                             });
                                         }
@@ -133,7 +130,7 @@ public class TskStatusREST extends GenericREST {
                                         if (errs.size() > 0) {
                                             return error(LinkedHashMapUtil.fromArrayList(errs));
                                         } else {
-                                            return updateEntity(mainRepo, req, auth).flatMap(e -> ok(e, TskStatus.class));
+                                            return updateEntity(mainRepo, req, getUserId(request)).flatMap(e -> ok(e, TskStatus.class));
                                         }
                                     }
                                 );

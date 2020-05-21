@@ -1,4 +1,4 @@
-package vn.com.sky.task.taskverification;
+package vn.com.sky.task.taskqualification;
 
 import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
@@ -17,21 +17,21 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.Constants;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.task.model.TskTaskVerification;
+import vn.com.sky.task.model.TskTaskQualification;
 import vn.com.sky.util.LinkedHashMapUtil;
 import vn.com.sky.util.MyServerResponse;
 
 @Configuration
 @AllArgsConstructor
-public class TskTaskVerificationREST extends GenericREST {
-    private TskTaskVerificationRepo mainRepo;
+public class TskTaskQualificationREST extends GenericREST {
+    private TskTaskQualificationRepo mainRepo;
 
     @Bean
-    public RouterFunction<?> tskTaskVerificationRoutes() {
-        return route(POST(buildURL(Constants.API_TASK_PREFIX, "task-verification", this::saveOrUpdate)), this::saveOrUpdate);
+    public RouterFunction<?> tskTaskQualificationRoutes() {
+        return route(POST(buildURL(Constants.API_TASK_PREFIX, "task-qualification", this::saveOrUpdate)), this::saveOrUpdate);
     }
     
-    private Mono<List<LinkedHashMap<String, String>>> validateForSave(TskTaskVerification req) {
+    private Mono<List<LinkedHashMap<String, String>>> validateForSave(TskTaskQualification req) {
       
     	var validateCode = utilRepo
                 .isTextValueExisted(getTableName(req), "code", req.getCode())
@@ -62,7 +62,7 @@ public class TskTaskVerificationREST extends GenericREST {
         return Flux.concat(validateCode, validateName).collectList();
     }
     
-    private Mono<List<LinkedHashMap<String, String>>> validateForUpdate(TskTaskVerification req) {
+    private Mono<List<LinkedHashMap<String, String>>> validateForUpdate(TskTaskQualification req) {
     	var validateCode = utilRepo
                 .isTextValueDuplicated(getTableName(req), "code", req.getCode(), req.getId())
                 .flatMap(
@@ -103,7 +103,7 @@ public class TskTaskVerificationREST extends GenericREST {
         // END SYSTEM BLOCK CODE
 
         return request
-                .bodyToMono(TskTaskVerification.class)
+                .bodyToMono(TskTaskQualification.class)
                 .flatMap(
                     req -> {
                         // client validation
@@ -118,7 +118,7 @@ public class TskTaskVerificationREST extends GenericREST {
                                             return error(LinkedHashMapUtil.fromArrayList(errs));
                                         } else {
                                             return saveEntity(mainRepo, req, getUserId(request)).flatMap(e -> {
-                                            	return ok(e, TskTaskVerification.class);
+                                            	return ok(e, TskTaskQualification.class);
                                             });
                                         }
                                     }
@@ -130,7 +130,7 @@ public class TskTaskVerificationREST extends GenericREST {
                                         if (errs.size() > 0) {
                                             return error(LinkedHashMapUtil.fromArrayList(errs));
                                         } else {
-                                            return updateEntity(mainRepo, req, getUserId(request)).flatMap(e -> ok(e, TskTaskVerification.class));
+                                            return updateEntity(mainRepo, req, getUserId(request)).flatMap(e -> ok(e, TskTaskQualification.class));
                                         }
                                     }
                                 );

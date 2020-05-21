@@ -17,7 +17,6 @@ import lombok.AllArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.model.PartNotification;
 import vn.com.sky.util.MyServerResponse;
 
@@ -26,7 +25,6 @@ import vn.com.sky.util.MyServerResponse;
 public class NotificationREST extends GenericREST {
     private CustomNotificationRepo customRepo;
     private NotificationRepo mainRepo;
-    private AuthenticationManager auth;
 
     @Bean
     public RouterFunction<?> notificationRoutes() {
@@ -44,9 +42,9 @@ public class NotificationREST extends GenericREST {
         }
         // END SYSTEM BLOCK CODE
         var textSearch = getParam(request, "textSearch");
-        
+        var type = getParam(request, "type");
         return customRepo
-                .findNotifications(auth.getUserId(), textSearch)
+                .findNotifications(getUserId(request), type, textSearch)
                 .flatMap(json -> {
                 	return ok(json);
                 	});
@@ -68,7 +66,7 @@ public class NotificationREST extends GenericREST {
             	return Flux.fromIterable(req.getToHumanListIds())
             		.flatMap(toHumanId -> {
             			req.setToHumanId(toHumanId);
-            			return saveEntity(mainRepo, req, auth);
+            			return saveEntity(mainRepo, req, getUserId(request));
             		}).collectList().flatMap(res -> ok(res, List.class));
             	
             });
@@ -98,7 +96,7 @@ public class NotificationREST extends GenericREST {
             				if(req.getIsFinished() != null) {
             					found.setIsFinished(req.getIsFinished());
             				}
-            				return updateEntity(mainRepo, found, auth).flatMap(res -> ok(res, PartNotification.class));
+            				return updateEntity(mainRepo, found, getUserId(request)).flatMap(res -> ok(res, PartNotification.class));
             			});
             	
             });

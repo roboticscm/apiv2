@@ -2,15 +2,19 @@ CREATE INDEX part_notification_idx_access_date ON part_notification(access_date 
 
 
 
-CREATE OR REPLACE FUNCTION find_notifications(_user_id BIGINT, _text_search TEXT)
+CREATE OR REPLACE FUNCTION find_notifications(_user_id BIGINT, _type TEXT, _text_search TEXT)
 RETURNS TEXT AS $$
 DECLARE 
 	ret_val TEXT;
 	_query TEXT;
 	cond TEXT = '';
 BEGIN
+IF _type IS NOT NULL THEN
+	cond = format(' AND notify.type = %L', _type);
+END IF;
+
 IF _text_search IS NOT NULL THEN
-	cond = ' AND notify.full_text_search like ''%' || _text_search || '%''';
+	cond = cond || ' AND lower(unaccent(notify.title)) like ''%' || lower(unaccent(_text_search)) || '%''';
 END IF;
 
 _query = format('

@@ -169,6 +169,36 @@ $$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
 
 
 
+
+CREATE OR REPLACE FUNCTION sys_build_json(_tmp_query TEXT, _full_count_query TEXT, _payload_query TEXT)
+RETURNS TEXT AS $$
+DECLARE 
+	full_query TEXT;
+	ret_val TEXT;
+BEGIN
+
+full_query = format('
+	%s
+	SELECT TO_JSON (T) FROM (
+		SELECT (%s) AS "fullCount",
+			(SELECT COALESCE(JSON_AGG(content), ''[]'') FROM (
+				%s
+				) AS content) AS payload
+	) AS T
+',_tmp_query, _full_count_query, _payload_query);
+
+EXECUTE full_query INTO ret_val;
+RETURN  ret_val;
+END;
+$$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
+
+
+
+
+
+
+
+
 create or replace function get_max_data_level(_user_id bigint, _menu_path text, _dep_id bigint)
 returns smallint as $$
 declare 

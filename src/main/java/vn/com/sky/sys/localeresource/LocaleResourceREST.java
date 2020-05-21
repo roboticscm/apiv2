@@ -18,7 +18,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.Message;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.model.LocaleResource;
 import vn.com.sky.sys.ownerorg.OwnerOrgRepo;
 import vn.com.sky.util.MyServerResponse;
@@ -28,7 +27,6 @@ import vn.com.sky.util.MyServerResponse;
 public class LocaleResourceREST extends GenericREST {
     private CustomLocaleResourceRepo customRepo;
     private LocaleResourceRepo mainRepo;
-    private AuthenticationManager auth;
     private OwnerOrgRepo ownerOrgRepo;
     
 
@@ -74,7 +72,7 @@ public class LocaleResourceREST extends GenericREST {
                                 .fromIterable(req.getAddArray())
                                 .flatMap(
                                     lr -> {
-                                        return super.saveEntity(mainRepo, lr, auth);
+                                        return super.saveEntity(mainRepo, lr, getUserId(request));
                                     }
                                 );
                     }
@@ -93,7 +91,7 @@ public class LocaleResourceREST extends GenericREST {
                                     )
                                     .flatMap(
                                         foundLocaleResource -> {
-                                            return super.softDeleteEntity(mainRepo, foundLocaleResource, auth);
+                                            return super.softDeleteEntity(mainRepo, foundLocaleResource, getUserId(request));
                                         }
                                     );
                             }
@@ -114,10 +112,10 @@ public class LocaleResourceREST extends GenericREST {
                                     .flatMap(
                                         foundLocaleResource -> {
                                             foundLocaleResource.setValue(lr.getNewValue());
-                                            return super.updateEntity(mainRepo, foundLocaleResource, auth);
+                                            return super.updateEntity(mainRepo, foundLocaleResource, getUserId(request));
                                         }
                                     )
-                                    .switchIfEmpty(saveLocaleResource(lr));
+                                    .switchIfEmpty(saveLocaleResource(getUserId(request), lr));
                             }
                         );
 
@@ -130,9 +128,9 @@ public class LocaleResourceREST extends GenericREST {
             );
     }
 
-    private Mono<LocaleResource> saveLocaleResource(LocaleResource lr) {
+    private Mono<LocaleResource> saveLocaleResource(Long userId, LocaleResource lr) {
         lr.setValue(lr.getNewValue());
-        return saveEntity(mainRepo, lr, auth);
+        return saveEntity(mainRepo, lr, userId);
     }
 
     private Mono<ServerResponse> sysGetUsedLangTypeGroups(ServerRequest request) {
@@ -224,6 +222,7 @@ public class LocaleResourceREST extends GenericREST {
             return badRequest().bodyValue(Message.INVALID_TABLE_NAME);
         }
 
+        
         try {
             return customRepo
                 .sysGetLocaleResourceByCompanyIdAndCatAndTypeGroup(

@@ -15,14 +15,19 @@ public class CustomNotificationRepo extends BaseR2dbcRepository {
 	--  userId
 	--  textSearch
 	*/
-    public Mono<String> findNotifications(Long userId, String textSearch) {
+    public Mono<String> findNotifications(Long userId, String type, String textSearch) {
         String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
 
         var ret =
             this.databaseClient()
-                .execute(genSql(methodName, "userId", "textSearch"))
+                .execute(genSql(methodName, "userId", "type", "textSearch"))
                 .bind("userId", userId);
 
+        if (type == null)
+        	ret = ret.bindNull("type", String.class);
+        else 
+        	ret = ret.bind("type", type);
+        
         if (textSearch == null)
         	ret = ret.bindNull("textSearch", String.class);
         else 

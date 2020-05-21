@@ -4,15 +4,15 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
 import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
-import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import lombok.AllArgsConstructor;
 import reactor.core.publisher.Mono;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.menu.MenuRepo;
 import vn.com.sky.sys.model.MenuHistory;
 import vn.com.sky.util.MyServerResponse;
@@ -22,7 +22,6 @@ import vn.com.sky.util.SDate;
 @AllArgsConstructor
 public class MenuHistoryREST extends GenericREST {
     private MenuHistoryRepo mainRepo;
-    private AuthenticationManager auth;
     private MenuRepo menuRepo;
 
     @Bean
@@ -61,21 +60,21 @@ public class MenuHistoryREST extends GenericREST {
             .flatMap(
                 req -> {
                     return mainRepo
-                        .findByUserIdDepIdAndMenuPath(auth.getUserId(), req.getDepartmentId(), req.getMenuPath())
+                        .findByUserIdDepIdAndMenuPath(getUserId(request), req.getDepartmentId(), req.getMenuPath())
                         .flatMap(
                             foundMenuHistory -> {
                                 foundMenuHistory.setLastAccess(SDate.now());
-                                return super.updateEntity(mainRepo, foundMenuHistory, auth);
+                                return super.updateEntity(mainRepo, foundMenuHistory, getUserId(request));
                             }
                         )
-                        .switchIfEmpty(saveMenuHistory(req))
+                        .switchIfEmpty(saveMenuHistory(request, req))
                         .flatMap(item -> ok(item, MenuHistory.class))
                         .onErrorResume(e -> error(e));
                 }
             );
     }
 
-    private Mono<MenuHistory> saveMenuHistory(MenuHistoryReq req) {
+    private Mono<MenuHistory> saveMenuHistory(ServerRequest request, MenuHistoryReq req) {
         return menuRepo
             .findByPath(req.getMenuPath())
             .flatMap(
@@ -83,9 +82,9 @@ public class MenuHistoryREST extends GenericREST {
                     var menuHistory = new MenuHistory();
                     menuHistory.setMenuId(foundMenu.getId());
                     menuHistory.setDepId(req.getDepartmentId());
-                    menuHistory.setHumanId(auth.getUserId());
+                    menuHistory.setHumanId(getUserId(request));
                     menuHistory.setLastAccess(SDate.now());
-                    return super.saveEntity(mainRepo, menuHistory, auth);
+                    return super.saveEntity(mainRepo, menuHistory, getUserId(request));
                 }
             );
     }

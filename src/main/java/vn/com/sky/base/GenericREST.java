@@ -26,7 +26,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.Constants;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.util.CustomRepoUtil;
 import vn.com.sky.util.MyServerResponse;
 import vn.com.sky.util.OneToOneRepo;
@@ -129,15 +128,35 @@ public class GenericREST {
     	return StringUtil.toSnackCase(entity.getClass().getSimpleName(), "_").substring(1);
     }
     
+//    protected <T extends GenericEntity> Mono<T> saveEntity(
+//            ReactiveCrudRepository<T, Long> repo,
+//            T entity,
+//            AuthenticationManager auth
+//        ) {
+//            entity.createdBy(auth != null ? auth.getUserId() : null);
+////            entity.setCreatedDate(SDate.now());
+////            entity.setVersion(1);
+////            entity.setDisabled(false);
+//
+//            if (entity instanceof SortableEntity) {
+//            	var tableName = getTableName(entity);
+//            	return utilRepo.getMaxSort(tableName).flatMap(maxSort -> {
+//            		((SortableEntity) entity).setSort(maxSort + 1);
+//            		return repo.save(entity);
+//            	});
+//            	
+//            } else {
+//            	return repo.save(entity);
+//            }
+//            
+//        }
+    
     protected <T extends GenericEntity> Mono<T> saveEntity(
             ReactiveCrudRepository<T, Long> repo,
             T entity,
-            AuthenticationManager auth
+            Long userId
         ) {
-            entity.createdBy(auth != null ? auth.getUserId() : null);
-//            entity.setCreatedDate(SDate.now());
-//            entity.setVersion(1);
-//            entity.setDisabled(false);
+            entity.createdBy(userId);
 
             if (entity instanceof SortableEntity) {
             	var tableName = getTableName(entity);
@@ -152,24 +171,44 @@ public class GenericREST {
             
         }
     
-    protected <T extends GenericEntity> Mono<T> updateEntity(
-        ReactiveCrudRepository<T, Long> repo,
-        T entity,
-        AuthenticationManager auth
-    ) {
-        entity.updatedBy(auth != null ? auth.getUserId() : null);
-        
-        return repo.save(entity);
-    }
+//    protected <T extends GenericEntity> Mono<T> updateEntity(
+//        ReactiveCrudRepository<T, Long> repo,
+//        T entity,
+//        AuthenticationManager auth
+//    ) {
+//        entity.updatedBy(auth != null ? auth.getUserId() : null);
+//        
+//        return repo.save(entity);
+//    }
 
+    protected <T extends GenericEntity> Mono<T> updateEntity(
+            ReactiveCrudRepository<T, Long> repo,
+            T entity,
+            Long userId
+        ) {
+            entity.updatedBy(userId);
+            
+            return repo.save(entity);
+        }
+    
+//    protected <T extends GenericEntity> Mono<T> softDeleteEntity(
+//        ReactiveCrudRepository<T, Long> repo,
+//        T entity,
+//        AuthenticationManager auth
+//    ) {
+//        entity.deletedBy(auth.getUserId());
+//        return repo.save(entity);
+//    }
+    
+    
     protected <T extends GenericEntity> Mono<T> softDeleteEntity(
-        ReactiveCrudRepository<T, Long> repo,
-        T entity,
-        AuthenticationManager auth
-    ) {
-        entity.deletedBy(auth.getUserId());
-        return repo.save(entity);
-    }
+            ReactiveCrudRepository<T, Long> repo,
+            T entity,
+            Long userId
+        ) {
+            entity.deletedBy(userId);
+            return repo.save(entity);
+        }
 
     protected HashMap<String, String> defaultValidate(GenericEntity entity) {
         Iterator<ConstraintViolation<GenericEntity>> it = validator.validate(entity).iterator();
@@ -220,7 +259,7 @@ public class GenericREST {
     }
 
     protected String getParam(ServerRequest request, String paramName) {
-        return getParam(request, paramName, null);
+        return getParam(request, paramName, "");
     }
 
     protected Long getLongParam(ServerRequest request, String paramName, Long defaultValue) throws Exception {
@@ -245,8 +284,14 @@ public class GenericREST {
             request.queryParam(paramName).orElse(defaultValue != null ? defaultValue.toString() : ""),
             StandardCharsets.UTF_8
         );
+        
         try {
-            return Boolean.parseBoolean(value);
+        	if(StringUtil.isBlank(value)) {
+        		return defaultValue;
+        	} else {
+        		return Boolean.parseBoolean(value);
+        	}
+            
         } catch (Exception e) {
             throw e;
         }
@@ -261,7 +306,7 @@ public class GenericREST {
         Long mainId,
         ArrayList<Long> subIds,
         SaveOneToOneRelation<T> saveOneToOne,
-        AuthenticationManager auth
+        ServerRequest request
     ) {
         if (subIds == null) {
             return Mono.empty();
@@ -274,10 +319,10 @@ public class GenericREST {
                             .findRelation(mainId, subId)
                             .flatMap(
                                 found -> {
-                                    return updateEntity(repo, found, auth);
+                                    return updateEntity(repo, found, getUserId(request));
                                 }
                             )
-                            .switchIfEmpty(saveOneToOne.saveEntity(mainId, subId));
+                            .switchIfEmpty(saveOneToOne.saveEntity(request, mainId, subId));
                     }
                 )
                 .collectList();
@@ -301,5 +346,12 @@ public class GenericREST {
                 )
                 .collectList();
         }
+    }
+    
+    protected Long getUserId(ServerRequest request) {
+    	var auth = request.headers().header("Authorization").get(0);
+    	var index = auth.indexOf("||| ");
+        var userId = auth.substring(0, index);
+    	return Long.parseLong(userId);
     }
 }

@@ -6,17 +6,18 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 import static org.springframework.web.reactive.function.server.ServerResponse.badRequest;
 
 import java.util.List;
-import lombok.AllArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import lombok.AllArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.menucontrol.MenuControlRepo;
 import vn.com.sky.sys.menuorg.MenuOrgRepo;
 import vn.com.sky.sys.model.RoleControl;
@@ -32,7 +33,6 @@ public class RoleDetailREST extends GenericREST {
     private CustomRoleDetailRepo customRepo;
     private RoleControlRepo roleControlRepo;
     private MenuControlRepo menuControlRepo;
-    private AuthenticationManager auth;
 
     @Bean
     public RouterFunction<?> roleDetailRoutes() {
@@ -126,7 +126,7 @@ public class RoleDetailREST extends GenericREST {
                                                 foundRoleDetail.setApprove(roleDetailWithControl.getApprove());
                                                 foundRoleDetail.setDataLevel(roleDetailWithControl.getDataLevel());
                                                 return 
-                                                    updateEntity(mainRepo, foundRoleDetail, auth)
+                                                    updateEntity(mainRepo, foundRoleDetail, getUserId(request))
                                                     .flatMap(
                                                         updatedRoleDetail -> {
                                                             return Flux
@@ -164,7 +164,7 @@ public class RoleDetailREST extends GenericREST {
                                                                                     return updateEntity(
                                                                                         roleControlRepo,
                                                                                         foundRoleControl,
-                                                                                        auth
+                                                                                        getUserId(request)
                                                                                     );
                                                                                 }
                                                                             )
@@ -224,7 +224,7 @@ public class RoleDetailREST extends GenericREST {
                             menuOrg -> {
                                 newRoleDetail.setMenuOrgId(menuOrg.getId());
                                 return 
-                                    saveEntity(mainRepo, newRoleDetail, auth)
+                                    saveEntity(mainRepo, newRoleDetail, getUserId(request))
                                     .flatMap(
                                         savedRoleDetail -> {
                                             return Flux
@@ -262,7 +262,7 @@ public class RoleDetailREST extends GenericREST {
                                                                     return updateEntity(
                                                                         roleControlRepo,
                                                                         foundRoleControl,
-                                                                        auth
+                                                                        getUserId(request)
                                                                     );
                                                                 }
                                                             )
@@ -307,7 +307,7 @@ public class RoleDetailREST extends GenericREST {
                     .flatMap(
                         foundRoleControl -> {
                             newRoleControl.setMenuControlId(foundRoleControl.getId());
-                            return saveEntity(roleControlRepo, newRoleControl, auth);
+                            return saveEntity(roleControlRepo, newRoleControl, getUserId(request));
                         }
                     );
             }

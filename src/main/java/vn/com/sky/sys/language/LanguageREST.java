@@ -4,15 +4,16 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
 import java.util.LinkedHashMap;
-import lombok.AllArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import lombok.AllArgsConstructor;
 import reactor.core.publisher.Mono;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.sys.model.Language;
 import vn.com.sky.util.MyServerResponse;
 
@@ -20,7 +21,6 @@ import vn.com.sky.util.MyServerResponse;
 @AllArgsConstructor
 public class LanguageREST extends GenericREST {
     private LanguageRepo mainRepo;
-    private AuthenticationManager auth;
 
     @Bean
     public RouterFunction<?> languageRoutes() {
@@ -69,7 +69,7 @@ public class LanguageREST extends GenericREST {
                                                 if (serverError.size() > 0) {
                                                     return error(serverError);
                                                 } else {
-                                                    return saveEntity(mainRepo, langReq, auth)
+                                                    return saveEntity(mainRepo, langReq, getUserId(request))
                                                         .flatMap(res -> ok(res, Language.class));
                                                 }
                                             }
@@ -99,7 +99,7 @@ public class LanguageREST extends GenericREST {
                                                             if (serverError.size() > 0) {
                                                                 return error(serverError);
                                                             } else {
-                                                                return updateEntity(mainRepo, langReq, auth)
+                                                                return updateEntity(mainRepo, langReq, getUserId(request))
                                                                     .flatMap(res -> ok(res, Language.class));
                                                             }
                                                         }

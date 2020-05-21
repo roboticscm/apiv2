@@ -19,7 +19,6 @@ import reactor.core.publisher.Mono;
 import vn.com.sky.Constants;
 import vn.com.sky.Message;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.security.PBKDF2Encoder;
 import vn.com.sky.sys.model.HumanOrOrg;
 import vn.com.sky.sys.model.HumanOrg;
@@ -34,7 +33,6 @@ public class HumanOrOrgREST extends GenericREST {
     private CustomRepoUtil utilRepo;
     private HumanOrOrgRepo mainRepo;
     private CustomHumanOrOrgRepo customRepo;
-    private AuthenticationManager auth;
     private PBKDF2Encoder encode;
     private HumanOrgRepo humanOrgRepo;
 
@@ -58,7 +56,7 @@ public class HumanOrOrgREST extends GenericREST {
         try {
             userId = getLongParam(request, "userId");
         } catch (Exception e1) {}
-        if (userId == null) userId = auth.getUserId();
+        if (userId == null) userId = getUserId(request);
 
         try {
             return customRepo.sysGetUserInfoById(userId).flatMap(item -> ok(item)).onErrorResume(e -> error(e));
@@ -107,7 +105,7 @@ public class HumanOrOrgREST extends GenericREST {
         return null;
     }
 
-    private Mono<ServerResponse> save(LinkedHashMap<String, String> serverError, HumanOrOrgReq humanReq) {
+    private Mono<ServerResponse> save(ServerRequest request, LinkedHashMap<String, String> serverError, HumanOrOrgReq humanReq) {
         return utilRepo
             .isTextValueExisted("human_or_org", "username", humanReq.getUsername())
             .flatMap(
@@ -129,7 +127,7 @@ public class HumanOrOrgREST extends GenericREST {
                                     // encode and password
                                     var encodedPassword = encode.encode(humanReq.getPassword());
                                     humanReq.setPassword(encodedPassword);
-                                    return saveEntity(mainRepo, humanReq, auth)
+                                    return saveEntity(mainRepo, humanReq, getUserId(request))
                                         .flatMap(
                                             saved -> {
                                                 return saveManyRelation(
@@ -137,7 +135,7 @@ public class HumanOrOrgREST extends GenericREST {
                                                         saved.getId(),
                                                         humanReq.getInsertDepartmentIds(),
                                                         new SaveRelation(),
-                                                        auth
+                                                        request
                                                     )
                                                     .flatMap(item -> ok(item, HumanOrOrg.class))
                                                     .then(
@@ -157,7 +155,7 @@ public class HumanOrOrgREST extends GenericREST {
             );
     }
 
-    private Mono<ServerResponse> update(LinkedHashMap<String, String> serverError, HumanOrOrgReq humanReq) {
+    private Mono<ServerResponse> update(ServerRequest request, LinkedHashMap<String, String> serverError, HumanOrOrgReq humanReq) {
         return utilRepo
             .isTextValueDuplicated("human_or_org", "username", humanReq.getUsername(), humanReq.getId())
             .flatMap(
@@ -192,14 +190,14 @@ public class HumanOrOrgREST extends GenericREST {
                                                 
                                                 if (Constants.SUPER_USER.equals(found.getUsername())) {
                                                 	// if login user is not Super User
-                                                	if(humanReq.getId() != auth.getUserId()) {
+                                                	if(humanReq.getId() != getUserId(request)) {
                                                 		return error("SYS.MSG.MODIFY_PREVENT");
                                                 	} else {
 	                                                	// Do not modify username of Super user
 	                                                	humanReq.setUsername(found.getUsername());
                                                 	}
                                                 }
-                                                return updateEntity(mainRepo, humanReq, auth)
+                                                return updateEntity(mainRepo, humanReq, getUserId(request))
                                                     .flatMap(
                                                         updated -> {
                                                             return saveManyRelation(
@@ -207,7 +205,7 @@ public class HumanOrOrgREST extends GenericREST {
                                                                     updated.getId(),
                                                                     humanReq.getInsertDepartmentIds(),
                                                                     new SaveRelation(),
-                                                                    auth
+                                                                    request
                                                                 )
                                                                 .flatMap(item -> ok(item, HumanOrOrg.class))
                                                                 .then(
@@ -253,9 +251,9 @@ public class HumanOrOrgREST extends GenericREST {
                     var serverError = new LinkedHashMap<String, String>();
 
                     if (humanReq.getId() == null) { // save
-                        return save(serverError, humanReq);
+                        return save(request, serverError, humanReq);
                     } else {
-                        return update(serverError, humanReq);
+                        return update(request, serverError, humanReq);
                     }
                 }
             );
@@ -264,11 +262,11 @@ public class HumanOrOrgREST extends GenericREST {
     private class SaveRelation implements SaveOneToOneRelation<HumanOrg> {
 
         @Override
-        public Mono<HumanOrg> saveEntity(Long mainId, Long subId) {
+        public Mono<HumanOrg> saveEntity(ServerRequest request, Long mainId, Long subId) {
             var humanOrg = new HumanOrg();
             humanOrg.setHumanId(mainId);
             humanOrg.setOrgId(subId);
-            return HumanOrOrgREST.this.saveEntity(HumanOrOrgREST.this.humanOrgRepo, humanOrg, HumanOrOrgREST.this.auth);
+            return HumanOrOrgREST.this.saveEntity(HumanOrOrgREST.this.humanOrgRepo, humanOrg, HumanOrOrgREST.this.getUserId(request));
         }
     }
 }
