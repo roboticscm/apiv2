@@ -129,8 +129,12 @@ public class LocaleResourceREST extends GenericREST {
     }
 
     private Mono<LocaleResource> saveLocaleResource(Long userId, LocaleResource lr) {
-        lr.setValue(lr.getNewValue());
-        return saveEntity(mainRepo, lr, userId);
+    	return Mono.defer(
+                () -> {
+                	lr.setValue(lr.getNewValue());
+                    return saveEntity(mainRepo, lr, userId);
+                });
+        
     }
 
     private Mono<ServerResponse> sysGetUsedLangTypeGroups(ServerRequest request) {

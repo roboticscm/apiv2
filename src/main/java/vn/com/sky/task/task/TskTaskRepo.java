@@ -18,14 +18,14 @@ public interface TskTaskRepo extends ReactiveCrudRepository<TskTask, Long> {
     
     @Query("SELECT * " + 
     		"FROM tsk_task " + 
-    		"WHERE submit_status = 1 AND (is_first_remindered = FALSE OR is_first_remindered IS NULL) AND " + 
+    		"WHERE submit_status in(1, 2) AND (is_first_remindered = FALSE OR is_first_remindered IS NULL) AND " + 
     		" 	first_reminder BETWEEN :startTime AND :endTime ")
     public Flux<TskTask> findFirstReminders(Long startTime, Long endTime);
     
     
     @Query("SELECT * " + 
     		"FROM tsk_task " + 
-    		"WHERE submit_status = 1 AND (is_second_remindered = FALSE OR is_second_remindered IS NULL) AND " + 
+    		"WHERE submit_status in (1, 2) AND (is_second_remindered = FALSE OR is_second_remindered IS NULL) AND " + 
     		" 	second_reminder BETWEEN :startTime AND :endTime ")
     public Flux<TskTask> findSecondReminders(Long startTime, Long endTime);
 }

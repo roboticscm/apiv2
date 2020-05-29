@@ -1,4 +1,5 @@
 CREATE EXTENSION pg_trgm;
+CREATE EXTENSION unaccent;
 
 CREATE OR REPLACE FUNCTION f_unaccent(text)
   RETURNS text AS
@@ -27,23 +28,36 @@ CREATE INDEX tsk_task_idx_03 ON tsk_task (created_by);
 CREATE INDEX tsk_task_idx_04 ON tsk_task USING GIN(F_UNACCENT(name) gin_trgm_ops);
 
 
+
+
+
 CREATE OR REPLACE FUNCTION tsk_find_tasks(_user_id BIGINT, _menu_path TEXT, _dep_id BIGINT, _page BIGINT, _page_size BIGINT,
   _text_search TEXT,
+  _is_exactly BOOL,
   _task_name TEXT,
   _project_name TEXT,
   _assignee_name TEXT,
   _assigner_name TEXT,
   _evaluator_name TEXT,
-  _is_completed boolean,
-  _is_delay_deadline boolean,
-  _created_date_from bigint,
-  _created_date_to bigint)
+  _is_completed BOOLEAN,
+  _is_delay_deadline BOOLEAN,
+  _created_date_from BIGINT,
+  _created_date_to BIGINT,
+  _start_time_from BIGINT,
+  _start_time_to BIGINT,
+  _deadline_from BIGINT,
+  _deadline_to BIGINT,
+  _is_assignee BOOLEAN,
+  _is_assigner BOOLEAN,
+  _is_evaluator BOOLEAN)
 RETURNS TEXT AS $$
 DECLARE 
 	ret_val TEXT;
 
 	data_level_cond1 TEXT = '';
 	data_level_cond2 TEXT = '';
+	data_level_cond3 TEXT = '';
+	
 	quick_cond TEXT = '';
 	adv_cond TEXT = '';
 	
@@ -54,12 +68,16 @@ DECLARE
 	tmp_query TEXT;
 	full_count_query TEXT;
 	payload_query TEXT;
-	full_query TEXT;
 	
 	_offset bigint = (_page - 1)*_page_size;
 	_limit bigint = _page_size;
 	
 	_now BIGINT = extract(epoch from now())::bigint;
+	
+	_not_assignee TEXT = '';
+	_not_assigner TEXT = '';
+	_not_evaluator TEXT = '';
+	__text_search TEXT = LOWER(F_UNACCENT(_text_search));
 BEGIN
 
 -- data level
@@ -80,17 +98,31 @@ ELSEIF list_staff IS NOT NULL THEN
 			WHERE task_id = task.id 
 				AND human_or_org_id IN (%s) 
 				AND (assign_position IN(%L, %L)
-					OR (assign_position = %L AND task.submit_status = 1	)		 
+					OR (assign_position = %L AND task.submit_status >= 1	)		 
 				)				  
  			)					 
+	', list_staff, list_staff, 'ASSIGNER', 'EVALUATOR', 'ASSIGNEE');
+	
+	data_level_cond3 = FORMAT('
+ 		AND task.created_by NOT IN (%s)
+		AND NOT EXISTS (
+			SELECT FROM tsk_assign_human_or_org h 
+			WHERE task_id = task.id 			  
+ 		)					 
 	', list_staff, list_staff, 'ASSIGNER', 'EVALUATOR', 'ASSIGNEE');
 END IF;
 
 -- quick search
 IF _text_search IS NOT NULL THEN
-	quick_cond = FORMAT('
-		AND document @@ TO_TSQUERY(%L)
-	', LOWER(F_UNACCENT(_text_search)));
+	IF _is_exactly = FALSE THEN
+		quick_cond = FORMAT('
+			AND document @@ TO_TSQUERY(%L)
+		', __text_search);
+	ELSE 
+		quick_cond = FORMAT('
+			AND (LOWER(F_UNACCENT(task.name)) = %L OR LOWER(F_UNACCENT(task.description)) = %L OR LOWER(F_UNACCENT(task.evaluate_comment)) = %L )
+		', __text_search, __text_search, __text_search);
+	END IF;
 END IF;
 
 
@@ -161,6 +193,60 @@ ELSEIF _created_date_to IS NOT NULL THEN
 	adv_cond = adv_cond || FORMAT(' AND task.created_date <= %L', _created_date_to);
 END IF;
 
+IF _start_time_from IS NOT NULL AND _start_time_to IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT(' AND task.start_time BETWEEN %L AND %L ', _start_time_from, _start_time_to);
+ELSEIF _start_time_from IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT(' AND task.start_time >= %L', _start_time_from);
+ELSEIF _start_time_to IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT(' AND task.start_time <= %L', _start_time_to);
+END IF;
+
+
+IF _deadline_from IS NOT NULL AND _deadline_to IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT(' AND task.deadline BETWEEN %L AND %L ', _deadline_from, _deadline_to);
+ELSEIF _deadline_from IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT(' AND task.deadline >= %L', _deadline_from);
+ELSEIF _created_date_to IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT(' AND task.deadline <= %L', _deadline_to);
+END IF;
+
+IF _is_assignee = FALSE THEN
+	_not_assignee = 'NOT';
+END IF;
+IF _is_assignee IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT('
+		AND %s EXISTS(
+			SELECT FROM tsk_assign_human_or_org WHERE assign_position=%L AND task_id = task.id AND human_or_org_id = %L
+			) 
+', _not_assignee, 'ASSIGNEE', _user_id );
+END IF;
+
+IF _is_assigner = FALSE THEN
+	_not_assigner = 'NOT';
+END IF;
+
+IF _is_assigner IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT('
+		AND %s EXISTS(
+			SELECT FROM tsk_assign_human_or_org WHERE assign_position=%L AND task_id = task.id AND human_or_org_id = %L
+			) 
+', _not_assigner, 'ASSIGNER', _user_id );
+END IF;
+
+IF _is_evaluator = FALSE THEN
+	_not_evaluator = 'NOT';
+END IF;
+
+IF _is_evaluator IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT('
+		AND %s EXISTS(
+			SELECT FROM tsk_assign_human_or_org WHERE assign_position=%L AND task_id = task.id AND human_or_org_id = %L
+			) 
+', _not_evaluator, 'EVALUATOR', _user_id );
+END IF;
+
+
+
 -- tmp table
 IF data_level_cond2 != '' THEN
 	tmp_query = FORMAT('
@@ -180,7 +266,16 @@ IF data_level_cond2 != '' THEN
 			%s
 			%s
 			%s
-	)', data_level_cond1, quick_cond, adv_cond, data_level_cond2, quick_cond, adv_cond);
+	
+		UNION ALL
+
+		SELECT task.*
+		FROM tsk_task task
+		WHERE task.deleted_by IS NULL
+			%s
+			%s
+			%s
+	)', data_level_cond1, quick_cond, adv_cond, data_level_cond2, quick_cond, adv_cond, data_level_cond3, quick_cond, adv_cond);
 ELSE 
 	tmp_query = FORMAT('
 	WITH tmp AS (
@@ -203,8 +298,8 @@ final_order_by = 'ORDER BY t.access_date DESC NULLS LAST';
 
 payload_query = FORMAT('
 	SELECT 
-		t.id, t.name, project.name as project_name, t.start_time, t.deadline, priority.name as priority_name,
-		t.assignee_start_time, t.assignee_end_time, t.evaluate_time,
+		t.id, t.name, project.name as "projectName", t.start_time as "startTime", t.deadline, priority.name as "priorityName",
+		t.assignee_start_time as "assigneeStartTime", t.assignee_end_time as "assigneeEndTime", t.evaluate_time as "evaluateTime",
 		array_agg(verity.name ORDER BY std.start_time DESC NULLS LAST) AS "lastStatusName",
 		array_agg(DISTINCT h_assigner.last_name || '' '' || h_assigner.first_name) AS "assigners",
 		array_agg(DISTINCT h_assignee.last_name || '' '' || h_assignee.first_name) AS "assignees",
@@ -220,7 +315,7 @@ payload_query = FORMAT('
 					   
 		LEFT JOIN tsk_priority priority ON priority.id = t.priority_id
 
-		LEFT JOIN tsk_status_detail std ON std.task_id = t.id AND std.submit_status = 1 AND std.assign_position=%L
+		LEFT JOIN tsk_status_detail std ON std.task_id = t.id AND std.submit_status >= 1 AND std.assign_position=%L
 		LEFT JOIN tsk_task_verification verity ON verity.id = std.verification_id
 
 		LEFT JOIN tsk_assign_human_or_org a_asigner ON a_asigner.task_id = t.id AND a_asigner.assign_position=%L
@@ -235,13 +330,11 @@ payload_query = FORMAT('
 			t.assignee_start_time, t.assignee_end_time, t.evaluate_time	
 		%s
 ', order_by, _offset, _limit, 'ASSIGNEE', 'ASSIGNER', 'ASSIGNEE', 'EVALUATOR', final_order_by);
-raise notice '%', tmp_query;
+
 
 RETURN  sys_build_json(tmp_query, full_count_query, payload_query);
 END;
 $$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
-
-
 
 
 
@@ -253,7 +346,7 @@ DECLARE
 BEGIN
 _query = FORMAT('SELECT COALESCE(json_agg(t), ''[]'')::TEXT 
 FROM(
-	SELECT t.*, creator.last_name || '' '' || creator.first_name as "creatorFullName",
+	SELECT t.*, creator.last_name || '' '' || creator.first_name as "creatorFullName", evaluate_verification.name as "evaluateVerificationName", evaluate_qualification.name as "evaluateQualificationName", priority.name as "priorityName",
 		array_agg(distinct taf.file_name) AS "taskAttachFiles",
 		array_agg(distinct jsonb_build_object(''id'', assigner.human_or_org_id, ''name'', h_assigner.last_name || '' '' || h_assigner.first_name)) AS "assigners",
 		array_agg(distinct jsonb_build_object(''id'', assignee.human_or_org_id, ''name'', h_assignee.last_name || '' '' || h_assignee.first_name)) AS "assignees",
@@ -271,6 +364,13 @@ FROM(
 		) ORDER BY assigner_status_detail.start_time) AS "assignerStatusDetails"
 				
 	FROM tsk_task t
+	
+	LEFT JOIN tsk_priority priority ON priority.id = t.priority_id
+				
+	LEFT JOIN tsk_task_verification evaluate_verification ON evaluate_verification.id = t.evaluate_verification_id
+	
+	LEFT JOIN tsk_task_qualification evaluate_qualification ON evaluate_qualification.id = t.evaluate_qualification_id			
+				
 				
 	LEFT JOIN human_or_org creator ON creator.id = t.created_by
 				
@@ -301,7 +401,7 @@ FROM(
 	LEFT JOIN tsk_status assigner_status ON assigner_status.id = assigner_status_detail.status_id
 				
 	WHERE t.id = %L
-	GROUP BY t.id, "creatorFullName"
+	GROUP BY t.id, "creatorFullName", "evaluateVerificationName", "evaluateQualificationName", "priorityName"
 ) as t', 'ASSIGNER', 'ASSIGNEE', 'EVALUATOR', 'CHAR', 'TARGET_PERSON', 'TARGET_TEAM', 'ASSIGNEE', 'ASSIGNER', _id );
 
 EXECUTE _query INTO ret_val;

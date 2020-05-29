@@ -193,6 +193,7 @@ public class CustomTableUtilRepo extends BaseR2dbcRepository {
         return ret.as(String.class).fetch().first();
     }
 
+    
     public Mono<Long> updateTableById(String tableName, String expression, Long id, Long updatedBy, Long updatedDate) {
         String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
 
@@ -206,5 +207,17 @@ public class CustomTableUtilRepo extends BaseR2dbcRepository {
                 .bind("updatedDate", updatedDate);
 
         return ret.as(Long.class).fetch().first();
+    }
+    
+    
+    public Mono<String> jsonQuery(String query) {
+        String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+
+        var ret =
+            this.databaseClient()
+                .execute(genSql(methodName, "query"))
+                .bind("query", query);
+
+        return ret.as(String.class).fetch().first();
     }
 }

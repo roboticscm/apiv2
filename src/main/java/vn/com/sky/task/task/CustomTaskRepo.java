@@ -21,6 +21,7 @@ public class CustomTaskRepo extends BaseR2dbcRepository {
 
     public Mono<String> tskFindTasks(Long userId, String menuPath, Long departmentId, Long page, Long pageSize,
     		String textSearch,
+    		Boolean isExactly,
     		String taskName,
     		String projecName,
     		String assigneeName,
@@ -29,7 +30,14 @@ public class CustomTaskRepo extends BaseR2dbcRepository {
     		Boolean isCompleted,
     		Boolean isDelayDeadline,
     		Long createdDateFrom,
-    		Long createdDateTo
+    		Long createdDateTo,
+    		Long startTimeFrom,
+    		Long startTimeTo,
+    		Long deadlineFrom,
+    		Long deadlineTo,
+    		Boolean isAssignee,
+    		Boolean isAssigner,
+    		Boolean isEvaluator
     		) {
         String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
 
@@ -37,6 +45,7 @@ public class CustomTaskRepo extends BaseR2dbcRepository {
             this.databaseClient()
                 .execute(genSql(methodName, "userId", "menuPath",  "departmentId", "page", "pageSize",
                 		"textSearch",
+                		"isExactly",
                 		"taskName",
                 		"projecName",
                 		"assigneeName",
@@ -45,9 +54,17 @@ public class CustomTaskRepo extends BaseR2dbcRepository {
                 		"isCompleted",
                 		"isDelayDeadline",
                 		"createdDateFrom",
-                		"createdDateTo"
+                		"createdDateTo",
+                		"startTimeFrom",
+                		"startTimeTo",
+                		"deadlineFrom",
+                		"deadlineTo",
+                		"isAssignee",
+                		"isAssigner",
+                		"isEvaluator"
                 		))
                 .bind("userId", userId)
+                .bind("isExactly", isExactly)
                 .bind("menuPath", menuPath)
                 .bind("departmentId", departmentId)
                 .bind("page", page)
@@ -64,6 +81,13 @@ public class CustomTaskRepo extends BaseR2dbcRepository {
         ret = bind(ret, "isDelayDeadline", isDelayDeadline, Boolean.class);
         ret = bind(ret, "createdDateFrom", createdDateFrom, Long.class);
         ret = bind(ret, "createdDateTo", createdDateTo, Long.class);
+        ret = bind(ret, "startTimeFrom", startTimeFrom, Long.class);
+        ret = bind(ret, "startTimeTo", startTimeTo, Long.class);
+        ret = bind(ret, "deadlineFrom", deadlineFrom, Long.class);
+        ret = bind(ret, "deadlineTo", deadlineTo, Long.class);
+        ret = bind(ret, "isAssignee", isAssignee, Boolean.class);
+        ret = bind(ret, "isAssigner", isAssigner, Boolean.class);
+        ret = bind(ret, "isEvaluator", isEvaluator, Boolean.class);
                
         
         return ret.as(String.class).fetch().first();

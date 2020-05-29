@@ -19,8 +19,8 @@ END IF;
 
 _query = format('
 	SELECT notify.id, notify.title, notify.target_id, notify.menu_path, notify.department_id, notify.created_date,
-		notify.type, notify.is_finished, notify.is_read, notify.is_cancel,
-		from_human_full_name, to_human_full_name,
+		notify.type, notify.message_type, notify.is_finished, notify.is_read, notify.is_cancel,
+		from_human_full_name, to_human_full_name, from_human_avatar, 
 		department_name
 	FROM (
 		SELECT 
@@ -28,6 +28,7 @@ _query = format('
 			notify.*,
 			from_human.last_name || '' '' || from_human.first_name AS from_human_full_name,
 			to_human.last_name || '' '' || to_human.first_name AS to_human_full_name,
+			from_human.icon_data as from_human_avatar, 
 			oo.name as department_name
 		FROM part_notification notify
 		LEFT JOIN human_or_org from_human ON from_human.id = notify.from_human_id

@@ -63,6 +63,7 @@ public class WebSecurityConfig {
             .permitAll()
             .pathMatchers(
                 "/",
+                "/api/sys/download",
                 "/document",
                 "/index.html",
                 "/js/main.js",

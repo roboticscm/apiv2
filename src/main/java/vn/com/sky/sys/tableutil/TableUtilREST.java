@@ -6,24 +6,24 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 import static org.springframework.web.reactive.function.server.ServerResponse.badRequest;
 
-import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import lombok.AllArgsConstructor;
 import reactor.core.publisher.Mono;
 import vn.com.sky.Message;
 import vn.com.sky.base.GenericREST;
-import vn.com.sky.security.AuthenticationManager;
 import vn.com.sky.util.MyServerResponse;
+import vn.com.sky.util.QueryUtil;
 import vn.com.sky.util.SDate;
 
 @Configuration
 @AllArgsConstructor
 public class TableUtilREST extends GenericREST {
     private CustomTableUtilRepo customRepo;
-    private AuthenticationManager auth;
 
     @Bean
     public RouterFunction<?> tableUtilRoutes() {
@@ -32,6 +32,7 @@ public class TableUtilREST extends GenericREST {
             .andRoute(GET(buildURL("table-util", this::getSimpleList)), this::getSimpleList)
             .andRoute(GET(buildURL("table-util", this::getOneById)), this::getOneById)
             .andRoute(GET(buildURL("table-util", this::getAllColumnsOfTable)), this::getAllColumnsOfTable)
+            .andRoute(GET(buildURL("table-util", this::jsonQuery)), this::jsonQuery)
             .andRoute(PUT(buildURL("table-util", this::updateTableById)), this::updateTableById)
             .andRoute(DELETE(buildURL("table-util", this::softDeleteMany)), this::softDeleteMany)
             .andRoute(DELETE(buildURL("table-util", this::restoreOrForeverDelete)), this::restoreOrForeverDelete);
@@ -60,7 +61,7 @@ public class TableUtilREST extends GenericREST {
         }
 
         return customRepo
-            .hasAnyDeletedRecord(tableName, onlyMe, auth.getUserId())
+            .hasAnyDeletedRecord(tableName, onlyMe, getUserId(request))
             .flatMap(item -> ok(item))
             .onErrorResume(e -> error(e));
     }
@@ -85,7 +86,7 @@ public class TableUtilREST extends GenericREST {
         if ((restoreIds != null && restoreIds.trim().length() == 0) || "null".equals(restoreIds)) restoreIds = null;
 
         return customRepo
-            .restoreOrForeverDelete(tableName, deleteIds, restoreIds, auth.getUserId(), SDate.now())
+            .restoreOrForeverDelete(tableName, deleteIds, restoreIds, getUserId(request), SDate.now())
             .flatMap(item -> ok(item))
             .onErrorResume(e -> error(e));
     }
@@ -114,7 +115,7 @@ public class TableUtilREST extends GenericREST {
         }
 
         return customRepo
-            .getAllDeletedRecords(tableName, columns, onlyMe, auth.getUserId())
+            .getAllDeletedRecords(tableName, columns, onlyMe, getUserId(request))
             .flatMap(item -> ok(item))
             .onErrorResume(e -> error(e));
     }
@@ -153,7 +154,7 @@ public class TableUtilREST extends GenericREST {
         }
 
         return customRepo
-            .getSimpleList(tableName, columns, orderBy, page, pageSize, onlyMe, auth.getUserId(), includeDisabled)
+            .getSimpleList(tableName, columns, orderBy, page, pageSize, onlyMe, getUserId(request), includeDisabled)
             .flatMap(item -> ok(item))
             .onErrorResume(e -> error(e));
     }
@@ -198,7 +199,7 @@ public class TableUtilREST extends GenericREST {
         if (deletedIds == null || "null".equals(deletedIds)) return badRequest().bodyValue(Message.INVALID_ID);
 
         return customRepo
-            .softDeleteMany(tableName, deletedIds, auth.getUserId(), SDate.now())
+            .softDeleteMany(tableName, deletedIds, getUserId(request), SDate.now())
             .flatMap(item -> ok(item))
             .onErrorResume(e -> error(e));
     }
@@ -215,6 +216,27 @@ public class TableUtilREST extends GenericREST {
         var tableName = getParam(request, "tableName");
 
         return customRepo.getAllColumnsOfTable(tableName).flatMap(item -> ok(item)).onErrorResume(e -> error(e));
+    }
+    
+    
+    private Mono<ServerResponse> jsonQuery(ServerRequest request) {
+        // SYSTEM BLOCK CODE
+        // PLEASE DO NOT EDIT
+        if (request == null) {
+            String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+            return Mono.just(new MyServerResponse(methodName));
+        }
+        // END SYSTEM BLOCK CODE
+
+        var query = getParam(request, "query");
+        
+        System.out.println(query);
+        
+        if(!QueryUtil.isValiad(query)) {
+        	return error("SYS.MSG.INVALID_QUERY");
+        }
+
+        return customRepo.jsonQuery(query).flatMap(item -> ok(item)).onErrorResume(e -> error(e));
     }
 
     private Mono<ServerResponse> updateTableById(ServerRequest request) {
@@ -239,7 +261,7 @@ public class TableUtilREST extends GenericREST {
         if (expression == null || "null".equals(expression)) return badRequest().bodyValue(Message.INVALID_EXPRESSION);
 
         return customRepo
-            .updateTableById(tableName, expression, id, auth.getUserId(), SDate.now())
+            .updateTableById(tableName, expression, id, getUserId(request), SDate.now())
             .flatMap(item -> ok(item))
             .onErrorResume(e -> error(e));
     }

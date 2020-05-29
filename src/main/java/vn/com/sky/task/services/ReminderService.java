@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 
 import lombok.AllArgsConstructor;
 import vn.com.sky.base.GenericREST;
+import vn.com.sky.sys.model.MessageType;
 import vn.com.sky.sys.model.NotifyType;
 import vn.com.sky.sys.model.PartNotification;
 import vn.com.sky.sys.notification.NotificationRepo;
@@ -23,33 +24,36 @@ public class ReminderService extends GenericREST implements Runnable {
 	private NotificationRepo notificationRepo;
 	private CustomOwnerOrgRepo ownerOrgRepo;
 	
-	private static final int CHECK_TIME = 5*1000;
+	private static final int CHECK_TIME = 60*1000;
 	@Override
 	public void run() {
 		while(true) {
 			long now = SDate.now();
 			
+			System.out.println(now);
 			
 			var firstReminder = taskRepo.findFirstReminders(now - 2*CHECK_TIME, now + 2*CHECK_TIME).collectList().block();
+			System.out.println(firstReminder);
 			if(firstReminder != null) {
 				firstReminder.forEach(item -> {
 					var humanIds = assignHumanRepo.findHumanIdsByTaskId(item.getId()).collectList().block();
 					item.setIsFirstRemindered(true);
 					updateEntity(taskRepo, item, (Long)null).subscribe();
 					
-					notify(item, humanIds, "First Reminder");
+					notify(item, humanIds, MessageType.REMINDER1.toString());
 				});
 			}
 			
 			
 			var secondReminder = taskRepo.findSecondReminders(now - 2*CHECK_TIME, now + 2*CHECK_TIME).collectList().block();
+			System.out.println(secondReminder);
 			if(secondReminder != null) {
 				secondReminder.forEach(item -> {
 					var humanIds = assignHumanRepo.findHumanIdsByTaskId(item.getId()).collectList().block();
 					item.setIsSecondRemindered(true);
 					updateEntity(taskRepo, item, (Long)null).subscribe();
 					
-					notify(item, humanIds, "Second Reminder");
+					notify(item, humanIds, MessageType.REMINDER2.toString());
 				});
 			}
 			
@@ -63,7 +67,7 @@ public class ReminderService extends GenericREST implements Runnable {
 	}
 	
 	
-	private void notify(TskTask task, List<Long> humanIds, String reminderType) {
+	private void notify(TskTask task, List<Long> humanIds, String messageType) {
 		humanIds.forEach(humanId -> {
 			final var menuPath = "task/task";
 			
@@ -80,7 +84,8 @@ public class ReminderService extends GenericREST implements Runnable {
 			notification.setMenuPath(menuPath);
 			notification.setTargetId(task.getId());
 			notification.setType(NotifyType.ALARM.toString());
-			notification.setTitle(reminderType + ": " + task.getName());
+			notification.setMessageType(messageType);
+			notification.setTitle(task.getName());
 			saveEntity(notificationRepo, notification, (Long)null).subscribe();
 		});
 	}

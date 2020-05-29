@@ -269,7 +269,12 @@ public class GenericREST {
         );
 
         try {
-            return Long.parseLong(value);
+        	if (StringUtil.isBlank(value)) {
+        		return defaultValue;
+        	} else {
+        		return Long.parseLong(value);
+        	}
+            
         } catch (Exception e) {
             throw e;
         }

@@ -275,3 +275,22 @@ execute _query into ret_val;
 return ret_val;
 end;
 $$ language plpgsql called on null input;
+
+
+
+
+CREATE OR REPLACE FUNCTION json_query(_query text)
+RETURNS TEXT AS $$
+DECLARE
+	ret_val TEXT;
+	full_query TEXT;
+BEGIN
+full_query = format('select coalesce(json_agg(t), ''[]'')::text 
+from(
+	%s
+) as t', _query);
+
+EXECUTE full_query INTO ret_val;
+RETURN ret_val;
+END;
+$$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;

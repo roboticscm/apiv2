@@ -85,21 +85,38 @@ public class TskTaskREST extends GenericREST {
 		var assigneeName = getParam(request, "assigneeName");
 		var assignerName = getParam(request, "assignerName");
 		var evaluatorName = getParam(request, "evaluatorName");
-		Boolean isCompleted = null, isDelayDeadline = null;
-		Long createdDateFrom = null, createdDateTo = null;
+		Boolean isCompleted = null, isDelayDeadline = null, isAssignee = null, isAssigner = null, isEvaluator = null, isExactly = false;
+		Long createdDateFrom = null, createdDateTo = null, startTimeFrom = null, startTimeTo = null, deadlineFrom = null, deadlineTo = null;
 		try {
+			isExactly = getBoolParam(request, "isExactly", false);
+			
 			isCompleted = getBoolParam(request, "isCompleted");
 			isDelayDeadline = getBoolParam(request, "isDelayDeadline");
+			
+			isAssignee = getBoolParam(request, "isAssignee");
+			isAssigner = getBoolParam(request, "isAssigner");
+			isEvaluator = getBoolParam(request, "isEvaluator");
+			
 			createdDateFrom = getLongParam(request, "createdDateFrom");
 			createdDateTo = getLongParam(request, "createdDateTo");
+			
+			startTimeFrom = getLongParam(request, "startTimeFrom");
+			startTimeTo = getLongParam(request, "startTimeTo");
+			
+			deadlineFrom = getLongParam(request, "deadlineFrom");
+			deadlineTo = getLongParam(request, "deadlineTo");
+			
 		} catch (Exception e) {
+			e.printStackTrace();
 		}
 				
+	
 	
         try {
             return customRepo
                 .tskFindTasks(getUserId(request), menuPath, departmentId, page, pageSize,
                 		textSearch, 
+                		isExactly,
                 		taskName,
                 		projectName,
                 		assigneeName,
@@ -108,7 +125,14 @@ public class TskTaskREST extends GenericREST {
                 		isCompleted,
                 		isDelayDeadline,
                 		createdDateFrom,
-                		createdDateTo
+                		createdDateTo,
+                		startTimeFrom,
+                		startTimeTo,
+                		deadlineFrom,
+                		deadlineTo,
+                		isAssignee,
+                		isAssigner,
+                		isEvaluator
                 ).flatMap(item -> ok(item))
                 .onErrorResume(e -> error(e));
         } catch (Exception e) {

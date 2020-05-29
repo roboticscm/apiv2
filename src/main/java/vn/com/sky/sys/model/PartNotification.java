@@ -22,6 +22,7 @@ public class PartNotification extends GenericEntity {
 	private Long departmentId;
 	private Long targetId;
 	private String type = NotifyType.CHAT.toString();
+	private String messageType;
 	private String title;
 	private Boolean isRead = false;
 	private Boolean isFinished = false;
