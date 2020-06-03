@@ -94,10 +94,8 @@ begin
 		end if;
 	else 
 		_department_id = sys_get_value_of_user_settings(_user_id, 'system', 'moduleId', 'lastDepartmentId');
-		if _department_id = '' then
+		if _department_id = '' or sys_is_department_assigned_for_user(_department_id::bigint, _user_id, false, false) = false then
 			_department_id = sys_get_first_roled_department_id_by_user_id(_user_id, false, false);
-		elseif sys_is_department_assigned_for_user(_department_id::bigint, _user_id, false, false) = false then
-			_department_id = '';
 		end if;
 
 		if _department_id = '' then

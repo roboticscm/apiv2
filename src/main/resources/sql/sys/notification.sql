@@ -1,7 +1,6 @@
 CREATE INDEX part_notification_idx_access_date ON part_notification(access_date DESC NULLS LAST);
 
 
-
 CREATE OR REPLACE FUNCTION find_notifications(_user_id BIGINT, _type TEXT, _text_search TEXT)
 RETURNS TEXT AS $$
 DECLARE 
@@ -14,13 +13,16 @@ IF _type IS NOT NULL THEN
 END IF;
 
 IF _text_search IS NOT NULL THEN
-	cond = cond || ' AND lower(unaccent(notify.title)) like ''%' || lower(unaccent(_text_search)) || '%''';
+	cond = cond || ' AND( lower(unaccent(notify.title)) like ''%' || lower(unaccent(_text_search)) || '%''';
+	cond = cond || ' OR notify.message_type like ''%' || upper(_text_search) || '%''';
+	cond = cond || ' OR lower(unaccent(from_human.first_name)) like ''%' || lower(unaccent(_text_search)) || '%''';
+	cond = cond || ' OR lower(unaccent(oo.name)) like ''%' || lower(unaccent(_text_search)) || '%'')';
 END IF;
 
 _query = format('
 	SELECT notify.id, notify.title, notify.target_id, notify.menu_path, notify.department_id, notify.created_date,
 		notify.type, notify.message_type, notify.is_finished, notify.is_read, notify.is_cancel,
-		from_human_full_name, to_human_full_name, from_human_avatar, 
+		from_human_full_name, notify.from_human_id, to_human_full_name,
 		department_name
 	FROM (
 		SELECT 
@@ -28,7 +30,6 @@ _query = format('
 			notify.*,
 			from_human.last_name || '' '' || from_human.first_name AS from_human_full_name,
 			to_human.last_name || '' '' || to_human.first_name AS to_human_full_name,
-			from_human.icon_data as from_human_avatar, 
 			oo.name as department_name
 		FROM part_notification notify
 		LEFT JOIN human_or_org from_human ON from_human.id = notify.from_human_id

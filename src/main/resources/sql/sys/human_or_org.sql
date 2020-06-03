@@ -161,3 +161,23 @@ END IF;
 return  ret_val;
 end;
 $$ language plpgsql called on null input;
+
+
+
+CREATE OR REPLACE FUNCTION find_avatars(_user_ids TEXT)
+RETURNS TEXT AS $$
+DECLARE 
+	_query TEXT;
+BEGIN
+
+
+_query = format('
+	SELECT id, low_icon_data as "lowIconData"
+	FROM human_or_org
+	WHERE low_icon_data IS NOT NULL AND id IN (%s)
+', _user_ids);
+
+RETURN json_query(_query);
+
+END;
+$$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;

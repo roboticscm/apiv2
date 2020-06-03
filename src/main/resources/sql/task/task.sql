@@ -30,7 +30,6 @@ CREATE INDEX tsk_task_idx_04 ON tsk_task USING GIN(F_UNACCENT(name) gin_trgm_ops
 
 
 
-
 CREATE OR REPLACE FUNCTION tsk_find_tasks(_user_id BIGINT, _menu_path TEXT, _dep_id BIGINT, _page BIGINT, _page_size BIGINT,
   _text_search TEXT,
   _is_exactly BOOL,
@@ -39,7 +38,7 @@ CREATE OR REPLACE FUNCTION tsk_find_tasks(_user_id BIGINT, _menu_path TEXT, _dep
   _assignee_name TEXT,
   _assigner_name TEXT,
   _evaluator_name TEXT,
-  _is_completed BOOLEAN,
+  _submit_status BIGINT,
   _is_delay_deadline BOOLEAN,
   _created_date_from BIGINT,
   _created_date_to BIGINT,
@@ -109,7 +108,7 @@ ELSEIF list_staff IS NOT NULL THEN
 			SELECT FROM tsk_assign_human_or_org h 
 			WHERE task_id = task.id 			  
  		)					 
-	', list_staff, list_staff, 'ASSIGNER', 'EVALUATOR', 'ASSIGNEE');
+	', list_staff);
 END IF;
 
 -- quick search
@@ -175,9 +174,11 @@ IF _evaluator_name IS NOT NULL THEN
 ', 'EVALUATOR', LOWER(F_UNACCENT(_evaluator_name)) );
 END IF;
 
-
-IF _is_completed IS NOT NULL THEN
-	adv_cond = adv_cond || FORMAT(' AND task.evaluate_complete = %L ', _is_completed);
+-- processing: held = 3
+IF _submit_status = 888 THEN
+	adv_cond = adv_cond || FORMAT(' AND task.submit_status IN (3::smallint) ');
+ELSEIF _submit_status IS NOT NULL THEN
+	adv_cond = adv_cond || FORMAT(' AND task.submit_status = %L::smallint ', _submit_status);
 END IF;
 
 
@@ -298,7 +299,7 @@ final_order_by = 'ORDER BY t.access_date DESC NULLS LAST';
 
 payload_query = FORMAT('
 	SELECT 
-		t.id, t.name, project.name as "projectName", t.start_time as "startTime", t.deadline, priority.name as "priorityName",
+		t.id, t.name, project.name as "projectName", t.submit_status as "submitStatus", t.start_time as "startTime", t.deadline, priority.name as "priorityName",
 		t.assignee_start_time as "assigneeStartTime", t.assignee_end_time as "assigneeEndTime", t.evaluate_time as "evaluateTime",
 		array_agg(verity.name ORDER BY std.start_time DESC NULLS LAST) AS "lastStatusName",
 		array_agg(DISTINCT h_assigner.last_name || '' '' || h_assigner.first_name) AS "assigners",
@@ -326,7 +327,7 @@ payload_query = FORMAT('
 
 		LEFT JOIN tsk_assign_human_or_org a_evaluator ON a_evaluator.task_id = t.id AND a_evaluator.assign_position=%L
 		LEFT JOIN human_or_org h_evaluator ON h_evaluator.id = a_evaluator.human_or_org_id
-		GROUP BY t.id, t.name, project.name, t.start_time, t.deadline, t.access_date, priority.name,
+		GROUP BY t.id, t.name, project.name, t.submit_status, t.start_time, t.deadline, t.access_date, priority.name,
 			t.assignee_start_time, t.assignee_end_time, t.evaluate_time	
 		%s
 ', order_by, _offset, _limit, 'ASSIGNEE', 'ASSIGNER', 'ASSIGNEE', 'EVALUATOR', final_order_by);
@@ -335,7 +336,6 @@ payload_query = FORMAT('
 RETURN  sys_build_json(tmp_query, full_count_query, payload_query);
 END;
 $$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
-
 
 
 
@@ -406,5 +406,113 @@ FROM(
 
 EXECUTE _query INTO ret_val;
 RETURN  ret_val;
+END;
+$$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
+
+
+
+
+CREATE OR REPLACE FUNCTION tsk_status_count(_user_id BIGINT, _menu_path TEXT, _dep_id BIGINT)
+RETURNS TEXT AS $$
+DECLARE 
+	data_level_cond1 TEXT = '';
+	data_level_cond2 TEXT = '';
+	data_level_cond3 TEXT = '';
+	list_staff TEXT;
+	tmp_query TEXT;
+	full_count_query TEXT;
+BEGIN
+
+-- data level
+list_staff = get_list_staff_ids(_user_id, _menu_path, _dep_id);
+
+IF list_staff = '' THEN -- prevent access
+	data_level_cond1 = ' AND FALSE ';
+	data_level_cond2 = ' AND FALSE ';
+ELSEIF list_staff IS NOT NULL THEN
+ 	data_level_cond1 = FORMAT('
+ 		AND task.created_by IN (%s)				 
+	', list_staff);
+	
+	data_level_cond2 = FORMAT('
+ 		AND task.created_by NOT IN (%s)
+		AND EXISTS (
+			SELECT FROM tsk_assign_human_or_org h 
+			WHERE task_id = task.id 
+				AND human_or_org_id IN (%s) 
+				AND (assign_position IN(%L, %L)
+					OR (assign_position = %L AND task.submit_status >= 1	)		 
+				)				  
+ 			)					 
+	', list_staff, list_staff, 'ASSIGNER', 'EVALUATOR', 'ASSIGNEE');
+	
+	data_level_cond3 = FORMAT('
+ 		AND task.created_by NOT IN (%s)
+		AND NOT EXISTS (
+			SELECT FROM tsk_assign_human_or_org h 
+			WHERE task_id = task.id 			  
+ 		)					 
+	', list_staff);
+END IF;
+
+
+-- tmp table
+IF data_level_cond2 != '' THEN
+	tmp_query = FORMAT('
+	WITH tmp AS (
+		SELECT task.*
+		FROM tsk_task task
+		WHERE task.deleted_by IS NULL
+			%s
+
+		UNION ALL
+
+		SELECT task.*
+		FROM tsk_task task
+		WHERE task.deleted_by IS NULL
+			%s
+	
+		UNION ALL
+
+		SELECT task.*
+		FROM tsk_task task
+		WHERE task.deleted_by IS NULL
+			%s
+	)', data_level_cond1, data_level_cond2, data_level_cond3);
+ELSE 
+	tmp_query = FORMAT('
+	WITH tmp AS (
+		SELECT task.*
+		FROM tsk_task task
+		WHERE task.deleted_by IS NULL
+			%s
+	)', data_level_cond1);
+END IF;
+
+full_count_query = format('
+	SELECT (
+			SELECT COUNT(*)
+			FROM tmp
+			WHERE submit_status = 0
+		) AS "statusNew", (
+			SELECT COUNT(*)
+			FROM tmp
+			WHERE submit_status = 1
+		) AS "statusSubmitted", (
+			SELECT COUNT(*)
+			FROM tmp
+			WHERE submit_status = 2
+		) AS "statusAssigned", (
+			SELECT COUNT(*)
+			FROM tmp
+			WHERE submit_status = 3
+		) AS "statusProcessing", (
+			SELECT COUNT(*)
+			FROM tmp
+			WHERE submit_status = 999
+		) AS "statusCompleted"
+');
+
+RETURN json_query(tmp_query || full_count_query);
 END;
 $$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;

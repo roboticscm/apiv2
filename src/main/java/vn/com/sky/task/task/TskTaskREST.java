@@ -49,7 +49,42 @@ public class TskTaskREST extends GenericREST {
         return route(POST(buildURL(Constants.API_TASK_PREFIX, "task", this::saveOrUpdate)), this::saveOrUpdate)
         		.andRoute(PUT(buildURL(Constants.API_TASK_PREFIX, "task", this::submitOrCancelSubmit)), this::submitOrCancelSubmit)
         		.andRoute(GET(buildURL(Constants.API_TASK_PREFIX, "task", this::tskFindTasks)), this::tskFindTasks)
+        		.andRoute(GET(buildURL(Constants.API_TASK_PREFIX, "task", this::tskStatusCount)), this::tskStatusCount)
         		.andRoute(GET(buildURL(Constants.API_TASK_PREFIX, "task", this::tskGetTaskById)), this::tskGetTaskById);
+    }
+    
+    
+    private Mono<ServerResponse> tskStatusCount(ServerRequest request) {
+        // SYSTEM BLOCK CODE
+        // PLEASE DO NOT EDIT
+        if (request == null) {
+            String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+            return Mono.just(new MyServerResponse(methodName));
+        }
+        // END SYSTEM BLOCK CODE
+
+        Long depId = null;
+		try {
+			depId = getLongParam(request, "depId");
+		} catch (Exception e1) {
+			e1.printStackTrace();
+		}
+		
+		if(depId == null) {
+			return error(Message.INVALID_ID);
+		}
+		
+		var menuPath = getParam(request, "menuPath");
+		
+        try {
+            return customRepo
+                .tskStatusCount(getUserId(request), menuPath, depId)
+                .flatMap(item -> ok(item))
+                .onErrorResume(e -> error(e));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
     
     
@@ -85,12 +120,13 @@ public class TskTaskREST extends GenericREST {
 		var assigneeName = getParam(request, "assigneeName");
 		var assignerName = getParam(request, "assignerName");
 		var evaluatorName = getParam(request, "evaluatorName");
-		Boolean isCompleted = null, isDelayDeadline = null, isAssignee = null, isAssigner = null, isEvaluator = null, isExactly = false;
+		Long submitStatus = null;
+		Boolean isDelayDeadline = null, isAssignee = null, isAssigner = null, isEvaluator = null, isExactly = false;
 		Long createdDateFrom = null, createdDateTo = null, startTimeFrom = null, startTimeTo = null, deadlineFrom = null, deadlineTo = null;
 		try {
 			isExactly = getBoolParam(request, "isExactly", false);
 			
-			isCompleted = getBoolParam(request, "isCompleted");
+			submitStatus = getLongParam(request, "submitStatus");
 			isDelayDeadline = getBoolParam(request, "isDelayDeadline");
 			
 			isAssignee = getBoolParam(request, "isAssignee");
@@ -122,7 +158,7 @@ public class TskTaskREST extends GenericREST {
                 		assigneeName,
                 		assignerName,
                 		evaluatorName,
-                		isCompleted,
+                		submitStatus,
                 		isDelayDeadline,
                 		createdDateFrom,
                 		createdDateTo,

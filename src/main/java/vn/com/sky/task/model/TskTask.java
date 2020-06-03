@@ -31,7 +31,6 @@ public class TskTask extends GenericEntity {
 	private Long evaluateQualificationId;
 	private Long evaluateVerificationId;
 	private Long evaluateStatusId;
-	private Boolean evaluateComplete = false;
     private Integer submitStatus = 0;
 
 }

@@ -30,6 +30,7 @@ public class CustomHumanOrOrgRepo extends BaseR2dbcRepository {
         return ret.as(String.class).fetch().first();
     }
 
+    
     public Mono<String> sysGetUserInfoById(Long userId) {
         String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
 
@@ -37,4 +38,15 @@ public class CustomHumanOrOrgRepo extends BaseR2dbcRepository {
 
         return ret.as(String.class).fetch().first();
     }
+    
+    
+    
+    public Mono<String> findAvatars(String userIds) {
+        String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+
+        var ret = this.databaseClient().execute(genSql(methodName, "userIds")).bind("userIds", userIds);
+
+        return ret.as(String.class).fetch().first();
+    }
+    
 }

@@ -39,6 +39,7 @@ public class HumanOrOrg extends GenericEntity implements UserDetails {
     private String fontIcon;
     private Boolean useFontIcon;
     private String iconData;
+    private String lowIconData;
     private Long passwordExpired;
     private Boolean activated = true;
     private Long lastLogin;

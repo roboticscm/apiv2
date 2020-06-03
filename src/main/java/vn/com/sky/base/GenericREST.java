@@ -280,6 +280,28 @@ public class GenericREST {
         }
     }
 
+    protected Integer getIntParam(ServerRequest request, String paramName, Integer defaultValue) throws Exception {
+        var value = URLDecoder.decode(
+            request.queryParam(paramName).orElse(defaultValue != null ? defaultValue.toString() : ""),
+            StandardCharsets.UTF_8
+        );
+
+        try {
+        	if (StringUtil.isBlank(value)) {
+        		return defaultValue;
+        	} else {
+        		return Integer.parseInt(value);
+        	}
+            
+        } catch (Exception e) {
+            throw e;
+        }
+    }
+    
+    protected Integer getIntParam(ServerRequest request, String paramName) throws Exception {
+        return getIntParam(request, paramName, null);
+    }
+    
     protected Long getLongParam(ServerRequest request, String paramName) throws Exception {
         return getLongParam(request, paramName, null);
     }

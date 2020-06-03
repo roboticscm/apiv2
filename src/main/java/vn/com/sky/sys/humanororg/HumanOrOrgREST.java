@@ -40,7 +40,8 @@ public class HumanOrOrgREST extends GenericREST {
     public RouterFunction<?> humanOrOrgRoutes() {
         return route(GET(buildURL("human-or-org", this::sysGetUserListByOrgId)), this::sysGetUserListByOrgId)
             .andRoute(POST(buildURL("human-or-org", this::saveOrUpdate)), this::saveOrUpdate)
-            .andRoute(GET(buildURL("human-or-org", this::sysGetUserInfoById)), this::sysGetUserInfoById);
+            .andRoute(GET(buildURL("human-or-org", this::sysGetUserInfoById)), this::sysGetUserInfoById)
+            .andRoute(GET(buildURL("human-or-org", this::findAvatars)), this::findAvatars);
     }
 
     private Mono<ServerResponse> sysGetUserInfoById(ServerRequest request) {
@@ -60,6 +61,29 @@ public class HumanOrOrgREST extends GenericREST {
 
         try {
             return customRepo.sysGetUserInfoById(userId).flatMap(item -> ok(item)).onErrorResume(e -> error(e));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    private Mono<ServerResponse> findAvatars(ServerRequest request) {
+        // SYSTEM BLOCK CODE
+        // PLEASE DO NOT EDIT
+        if (request == null) {
+            String methodName = new Object() {}.getClass().getEnclosingMethod().getName();
+            return Mono.just(new MyServerResponse(methodName));
+        }
+        // END SYSTEM BLOCK CODE
+
+        String userIds = getParam(request, "userIds", null);
+
+        if(userIds == null) {
+        	return badRequest().bodyValue("SYS.MSG.INVILID_USER_ID");
+        }
+        
+        try {
+            return customRepo.findAvatars(userIds).flatMap(item -> ok(item)).onErrorResume(e -> error(e));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -197,6 +221,7 @@ public class HumanOrOrgREST extends GenericREST {
 	                                                	humanReq.setUsername(found.getUsername());
                                                 	}
                                                 }
+                                                System.out.println(humanReq.getLowIconData());
                                                 return updateEntity(mainRepo, humanReq, getUserId(request))
                                                     .flatMap(
                                                         updated -> {

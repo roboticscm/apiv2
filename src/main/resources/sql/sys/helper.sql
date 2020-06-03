@@ -209,7 +209,7 @@ _query = format('
 	select max(data_level)
 	from role_detail
 	where menu_org_id in (select id from menu_org where org_id = %L and menu_id in (select id from menu where path=%L ))
-		and role_id in (select role_id from assignment_role where user_id=%L)
+		and role_id in (select role_id from assignment_role where user_id=%L and deleted_by is null and disabled = false)
 ', _dep_id, _menu_path, _user_id);
 
 execute _query into ret_val;
@@ -218,5 +218,24 @@ end;
 $$ language plpgsql called on null input;
 
 
+
+
+CREATE OR REPLACE FUNCTION is_manager(_manger_id BIGINT, _staff_id BIGINT, _menu_path TEXT, _dep_id BIGINT)
+RETURNS BOOL AS $$
+DECLARE 
+	list_staff TEXT;
+BEGIN
+IF _manger_id = _staff_id THEN
+	RETURN FALSE;
+ELSE
+	list_staff = get_list_staff_ids(_manger_id, _menu_path, _dep_id);
+	IF list_staff IS NULL THEN
+		RETURN TRUE;
+	ELSE
+		RETURN ARRAY[_staff_id] <@ STRING_TO_ARRAY(list_staff, ',')::BIGINT[];
+	END IF;
+END IF;
+END;
+$$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
 
 
