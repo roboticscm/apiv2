@@ -164,6 +164,65 @@ $$ language plpgsql called on null input;
 
 
 
+--version 2
+CREATE OR REPLACE FUNCTION get_list_staff_ids(_user_id BIGINT, _menu_path TEXT, _dep_id BIGINT)
+RETURNS TEXT AS $$
+DECLARE 
+	_query TEXT;
+	ret_val TEXT;
+	is_admin BOOL;
+	data_level SMALLINT;
+BEGIN
+-- data_level = 10000: company
+-- data_level = 1000: branch
+-- data_level = 100: department
+-- data_level = 10: group
+-- data_level = 0: default
+
+is_admin = is_system_admin_by_user_id(_user_id, false, false);
+data_level = get_max_data_level(_user_id, _menu_path, _dep_id);
+
+
+IF is_admin = TRUE OR data_level = 10000 THEN
+	ret_val = null;
+ELSEIF data_level IS NOT NULL THEN
+	_query = format(' 
+		SELECT COALESCE(ARRAY_TO_STRING(ARRAY_AGG(DISTINCT user_id), %L), %L)
+		FROM assignment_role al
+		WHERE al.deleted_by IS NULL AND EXISTS (
+			SELECT
+			FROM role_detail rd
+			WHERE rd.role_id = al.role_id
+				AND (rd.data_level < %L OR rd.data_level IS NULL) 
+				AND EXISTS (
+					SELECT 
+					FROM menu_org mo
+					WHERE mo.id = rd.menu_org_id
+						AND mo.org_id = %L
+						AND EXISTS (
+							SELECT
+							FROM menu
+							WHERE menu.id = mo.menu_id
+								AND menu.path = %L
+						)
+				)
+		)
+	', ',', '', data_level, _dep_id, _menu_path);
+	execute _query into ret_val;
+ELSE 
+	ret_val = '';
+END IF;
+
+IF ret_val = '' THEN
+	ret_val = _user_id;
+END IF;
+
+RETURN  ret_val;
+END;
+$$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
+
+
+
 CREATE OR REPLACE FUNCTION find_avatars(_user_ids TEXT)
 RETURNS TEXT AS $$
 DECLARE 

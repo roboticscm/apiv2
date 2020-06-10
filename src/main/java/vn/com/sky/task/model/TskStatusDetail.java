@@ -29,4 +29,6 @@ public class TskStatusDetail extends GenericEntity {
 	private ArrayList<String> removeAttachFiles;
 	@Transient
 	private ArrayList<String> insertAttachFiles;
+	@Transient
+	private Boolean completed;
 }

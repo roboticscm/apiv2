@@ -42,6 +42,7 @@ dependencies {
 	compile group: 'io.jsonwebtoken', name: 'jjwt-api', version: '0.10.7'
 	runtime group: 'io.jsonwebtoken', name: 'jjwt-impl', version: '0.10.7'
 	runtime group: 'io.jsonwebtoken', name: 'jjwt-jackson', version: '0.10.7'
+	compile group: 'org.jsoup', name: 'jsoup', version: '1.13.1'
 	implementation("org.jetbrains.kotlin:kotlin-stdlib")
     runtime files('src/main/resources')
 	annotationProcessor 'org.projectlombok:lombok'

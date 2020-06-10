@@ -15,7 +15,7 @@ CREATE INDEX tsk_task_idx_01 ON tsk_task (access_date DESC NULLS LAST);
 
 ALTER TABLE tsk_task
 ADD COLUMN document TSVECTOR
-GENERATED ALWAYS AS (TO_TSVECTOR('ENGLISH', LOWER(F_UNACCENT(COALESCE(name, ''))) || ' ' || LOWER(F_UNACCENT(COALESCE(description, ''))) || ' ' || LOWER(F_UNACCENT(COALESCE(evaluate_comment, ''))))) STORED;
+GENERATED ALWAYS AS (TO_TSVECTOR('ENGLISH', LOWER(F_UNACCENT(COALESCE(name, ''))) || ' ' || LOWER(F_UNACCENT(COALESCE(description, ''))) || ' ' || LOWER(F_UNACCENT(COALESCE(evaluate_comment, ''))) || ' ' || code )) STORED;
 
 DROP INDEX tsk_task_idx_02;
 CREATE INDEX tsk_task_idx_02 ON tsk_task USING GIN(document);
@@ -33,6 +33,7 @@ CREATE INDEX tsk_task_idx_04 ON tsk_task USING GIN(F_UNACCENT(name) gin_trgm_ops
 CREATE OR REPLACE FUNCTION tsk_find_tasks(_user_id BIGINT, _menu_path TEXT, _dep_id BIGINT, _page BIGINT, _page_size BIGINT,
   _text_search TEXT,
   _is_exactly BOOL,
+  _task_code TEXT,
   _task_name TEXT,
   _project_name TEXT,
   _assignee_name TEXT,
@@ -86,6 +87,7 @@ IF list_staff = '' THEN -- prevent access
 	data_level_cond1 = ' AND FALSE ';
 	data_level_cond2 = ' AND FALSE ';
 ELSEIF list_staff IS NOT NULL THEN
+	list_staff = list_staff || ',' || _user_id;
  	data_level_cond1 = FORMAT('
  		AND task.created_by IN (%s)				 
 	', list_staff);
@@ -119,13 +121,18 @@ IF _text_search IS NOT NULL THEN
 		', __text_search);
 	ELSE 
 		quick_cond = FORMAT('
-			AND (LOWER(F_UNACCENT(task.name)) = %L OR LOWER(F_UNACCENT(task.description)) = %L OR LOWER(F_UNACCENT(task.evaluate_comment)) = %L )
-		', __text_search, __text_search, __text_search);
+			AND (LOWER(F_UNACCENT(task.name)) = %L OR LOWER(F_UNACCENT(task.description)) = %L OR LOWER(F_UNACCENT(task.evaluate_comment)) = %L OR LOWER(F_UNACCENT(task.code)) = %L )
+		', __text_search, __text_search, __text_search, __text_search);
 	END IF;
 END IF;
 
 
 -- adv-search
+IF _task_code IS NOT NULL THEN
+	adv_cond = FORMAT(' AND F_UNACCENT(task.code) ~* %L', LOWER(F_UNACCENT(_task_code)) );
+END IF;
+
+
 IF _task_name IS NOT NULL THEN
 	adv_cond = FORMAT(' AND F_UNACCENT(task.name) ~* %L', LOWER(F_UNACCENT(_task_name)) );
 END IF;
@@ -336,6 +343,9 @@ payload_query = FORMAT('
 RETURN  sys_build_json(tmp_query, full_count_query, payload_query);
 END;
 $$ LANGUAGE PLPGSQL CALLED ON NULL INPUT;
+
+
+
 
 
 

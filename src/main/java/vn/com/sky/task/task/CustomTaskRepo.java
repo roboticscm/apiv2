@@ -22,6 +22,7 @@ public class CustomTaskRepo extends BaseR2dbcRepository {
     public Mono<String> tskFindTasks(Long userId, String menuPath, Long departmentId, Long page, Long pageSize,
     		String textSearch,
     		Boolean isExactly,
+    		String taskCode,
     		String taskName,
     		String projecName,
     		String assigneeName,
@@ -46,6 +47,7 @@ public class CustomTaskRepo extends BaseR2dbcRepository {
                 .execute(genSql(methodName, "userId", "menuPath",  "departmentId", "page", "pageSize",
                 		"textSearch",
                 		"isExactly",
+                		"taskCode",
                 		"taskName",
                 		"projecName",
                 		"assigneeName",
@@ -72,6 +74,7 @@ public class CustomTaskRepo extends BaseR2dbcRepository {
         
         
         ret = bind(ret, "textSearch", textSearch, String.class);
+        ret = bind(ret, "taskCode", taskCode, String.class);
         ret = bind(ret, "taskName", taskName, String.class);
         ret = bind(ret, "projecName", projecName, String.class);
         ret = bind(ret, "assigneeName", assigneeName, String.class);

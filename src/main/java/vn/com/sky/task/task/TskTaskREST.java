@@ -115,6 +115,7 @@ public class TskTaskREST extends GenericREST {
 		}
         
 		var textSearch = getParam(request, "textSearch");
+		var taskCode = getParam(request, "taskCode");
 		var taskName = getParam(request, "taskName");
 		var projectName = getParam(request, "projectName");
 		var assigneeName = getParam(request, "assigneeName");
@@ -153,6 +154,7 @@ public class TskTaskREST extends GenericREST {
                 .tskFindTasks(getUserId(request), menuPath, departmentId, page, pageSize,
                 		textSearch, 
                 		isExactly,
+                		taskCode,
                 		taskName,
                 		projectName,
                 		assigneeName,
@@ -261,6 +263,7 @@ public class TskTaskREST extends GenericREST {
         
         return request
                 .bodyToMono(TskStatusDetail.class).flatMap(req -> {
+                	
                 	return statusDetailRepo.findById(req.getId()).flatMap(found -> {
                 		found.setStartTime(req.getStartTime());
                 		found.setEndTime(req.getEndTime());

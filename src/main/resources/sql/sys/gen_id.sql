@@ -22,6 +22,39 @@ $$ LANGUAGE PLPGSQL;
 
 
 
+CREATE OR REPLACE FUNCTION gen_code(
+	prefix character varying,
+	table_name character varying,
+	company bigint, len smallint)
+RETURNS TEXT
+LANGUAGE 'plpgsql'
+COST 100
+VOLATILE 
+AS $BODY$
+DECLARE cur_id BIGINT;
+DECLARE ret TEXT;
+DECLARE last_year_text TEXT;
+DECLARE p_name TEXT;
+
+BEGIN
+	p_name = table_name||company||'0'||'_'||date_part('year', now());
+	last_year_text = right(date_part('year', now())::text, 4);
+	SELECT T."value" INTO cur_id 
+	FROM seq T 
+	WHERE T ."name" = p_name LIMIT 1 ;
+	IF cur_id IS NULL THEN 
+		cur_id := 1 ;
+		INSERT INTO seq ("table_name", "name", "value") VALUES(table_name, p_name, cur_id) ;
+	ELSE
+		cur_id := cur_id + 1 ;
+		UPDATE seq SET "value" = cur_id WHERE "name" = p_name ;
+	END IF ;
+	ret := prefix ||'-'||last_year_text||'-'|| to_char(cur_id, 'fm' || REPEAT('0', len));
+	RETURN ret;
+END;
+$BODY$;
+
+ALTER TABLE tsk_task ADD COLUMN code TEXT DEFAULT gen_code('TASK', 'tsk_task', 1, 5::smallint);
 
 
 
